@@ -837,18 +837,29 @@ Hero = function() {
 
 	this.direction = RIGHT;
 
-	this.sprite = $('miner');
+	this.sprites = [];
+
+	this.sprites['miner_0'] = $('miner_0');
+	this.sprites['miner_1'] = $('miner_1');
+	this.sprites['miner_2'] = $('miner_2');
+	this.sprites['miner_m1'] = $('miner_m1');
+	this.sprites['miner_m2'] = $('miner_m2');
 
 	this.draw = function() {
 
 		cxt.save();
 		
+		var sprite = 'miner_' + this.look + '';
+		sprite = sprite.replace('-','m');
+
+		var img = this.sprites[sprite];
+
 		if(this.direction == 'left') {
 			cxt.translate(960, 0);
 			cxt.scale(-1, 1); 
-			cxt.drawImage(this.sprite, 920 - this.x, this.y - this.cellSize * 2);
+			cxt.drawImage(img, 920 - this.x, this.y - this.cellSize * 2);
 		} else {
-			cxt.drawImage(this.sprite, this.x, this.y - this.cellSize * 2);
+			cxt.drawImage(img, this.x, this.y - this.cellSize * 2);
 		}
 
 		cxt.restore();
