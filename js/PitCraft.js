@@ -4,6 +4,7 @@ var cxt,map;
 var RIGHT_PRESSED = false,
 	LEFT_PRESSED  = false,
 	HERO_MOVED = false,
+	SHIFT_PRESSED = false,
 	JUMP_PRESSED  = false;
 
 (function(){
@@ -45,6 +46,9 @@ function PitCraft() {
 	this.keyPressed = false;
 
 	this.blockInHand = 'stairs';
+
+	this.lastFallFrame = 0;
+	this.fallTimeout = 50;
 
 	this.init = function() {	
 		//Listen for mouse events
@@ -212,7 +216,7 @@ function PitCraft() {
 
 		} else {
 
-			if( block.walkable == false ) {
+			if( block.empty == false ) {
 				map.fillStyle = '#444';
 				map.lineWidth = 1;
 				//map.strokeRect(this.cellSize*x,this.cellSize*y,this.cellSize,this.cellSize);
@@ -320,34 +324,6 @@ function PitCraft() {
 
 	}
 
-
-	function HSVtoRGB(h, s, v) {
-	    var r, g, b, i, f, p, q, t;
-	    if (h && s === undefined && v === undefined) {
-	        s = h.s, v = h.v, h = h.h;
-	    }
-	    i = Math.floor(h * 6);
-	    f = h * 6 - i;
-	    p = v * (1 - s);
-	    q = v * (1 - f * s);
-	    t = v * (1 - (1 - f) * s);
-	    switch (i % 6) {
-	        case 0: r = v, g = t, b = p; break;
-	        case 1: r = q, g = v, b = p; break;
-	        case 2: r = p, g = v, b = t; break;
-	        case 3: r = p, g = q, b = v; break;
-	        case 4: r = t, g = p, b = v; break;
-	        case 5: r = v, g = p, b = q; break;
-	    }
-
-	    var c = {
-	        r: Math.floor(r * 255),
-	        g: Math.floor(g * 255),
-	        b: Math.floor(b * 255)
-	    };
-
-	    return 'rgb('+c.r+','+c.g+','+c.b+')';
-	}
 
 	this.findPath = function(p1,p2) {
 
@@ -489,13 +465,29 @@ function PitCraft() {
 			_this.mouse.up = true;
 		});*/
 
-		window.addEventListener('keyup',function(e) {			
+		window.addEventListener('keyup',function(e) {	
 			var ESC = 27;
 
 			switch( e.keyCode ) {
 				case ESC:
 					_this.pauseGame(e);
 					break;
+
+				case 32: //SPACE
+					//Jump or Climb
+					_this.climbUp();
+					break;
+
+				case 49: // 1
+					_this.blockInHand = 'dirt';
+					break;
+				case 50: // 2
+					_this.blockInHand = 'stone';
+					break;
+				case 51: // 3
+					_this.blockInHand = 'stairs';
+					break;
+
 
 				case 69: // E
 					_this.hitBlock();
@@ -506,32 +498,60 @@ function PitCraft() {
 					break;
 
 				case 87: // W
-					_this.moveUp();
+					//_this.moveUp();
 					break;
+
 				case 83: // S
-					_this.moveDown();
+					//_this.moveDown();
 					break;
 
 				case 16: //SHIFT
 					SHIFT_PRESSED = false;
-					_this.hero.speed = _this.hero.walkSpeed;
+					//_this.hero.speed = _this.hero.walkSpeed;
 					break;
 
 				case 68: // D
-					RIGHT_PRESSED = false;
-					_this.moveRight();
+					//RIGHT_PRESSED = false;
+					//_this.moveRight();
 					break;
 				case 65: // A
-					LEFT_PRESSED = false;
-					_this.moveLeft();
+					//LEFT_PRESSED = false;
+					//_this.moveLeft();
+					break;
+
+				case 39: // Look RIGHT
+					if( _this.hero.direction == 'right' || SHIFT_PRESSED ) {
+						_this.moveRight();
+					} else {
+						_this.hero.direction  = 'right';
+					}
+
+					break;
+
+				case 37: // Look LEFT
+					
+					if( _this.hero.direction == 'left' || SHIFT_PRESSED ) {
+						_this.moveLeft();
+					} else {
+						_this.hero.direction  = 'left';
+					}
+
 					break;
 
 				case 38: //UP
-					_this.hero.lookUp();
+					if( SHIFT_PRESSED ) {
+						_this.moveUp();	
+					} else {
+						_this.hero.lookUp();
+					}
 					UP_PRESSED = false;
 					break;
 				case 40: //DOWN
-					_this.hero.lookDown();
+					if( SHIFT_PRESSED ) {
+						_this.moveDown();	
+					} else {
+						_this.hero.lookDown();
+					}
 					DOWN_PRESSED = false;
 					break;
 			}
@@ -544,7 +564,7 @@ function PitCraft() {
 			switch( e.keyCode ) {
 				case 16: //SHIFT
 					SHIFT_PRESSED = true;
-					_this.hero.speed = _this.hero.runSpeed;
+					//_this.hero.speed = _this.hero.runSpeed;
 					break;
 
 				case 68: // D 
@@ -555,10 +575,10 @@ function PitCraft() {
 					break;
 
 				case 39: // Look RIGHT
-					_this.hero.direction = 'right';
+					//_this.hero.direction = 'right';
 					break;
 				case 37: // Look LEFT
-					_this.hero.direction = 'left';
+					//_this.hero.direction = 'left';
 					break;
 
 				case 38: //Look UP
@@ -572,36 +592,119 @@ function PitCraft() {
 	}
 
 	this.moveRight = function() {
-		this.hero.moveRight();
-		HERO_MOVED = true;
+		var b1 = this.hero.fitInCells[0],
+			u1 = this.viewBlock(b1.x + 1, b1.y).walkable,
+			b2 = this.hero.fitInCells[1],
+			u2 = this.viewBlock(b2.x + 1, b2.y).walkable;
+
+		if( u1 && u2  ||  this.hero.fitInCells.length > 2) {
+			this.hero.moveRight();
+			HERO_MOVED = true;
+		}
 	}
 
 	this.moveLeft = function() {
-		this.hero.moveLeft();
-		HERO_MOVED = true;
+		var b1 = this.hero.fitInCells[0],
+			u1 = this.viewBlock(b1.x - 1, b1.y).walkable,
+			b2 = this.hero.fitInCells[1],
+			u2 = this.viewBlock(b2.x - 1, b2.y).walkable;
+
+		if( u1 && u2  ||  this.hero.fitInCells.length > 2) {
+			this.hero.moveLeft();
+			HERO_MOVED = true;
+		}
 	}
 
 	this.moveDown = function() {
 		var b1 = this.hero.fitInCells[0],
-			u1 = this.view[b1.x][b1.y+1].walkable,
+			u1 = this.viewBlock(b1.x, b1.y + 1).walkable,
 			b2 = null,
 			u2 = true;
 
-		if( typeof this.hero.fitInCells[2] !== 'undefined'	 ) {
+		//If miner stand on 2 blocks
+		if( typeof this.hero.fitInCells[2] !== 'undefined' ) {
 			var b2 = this.hero.fitInCells[2];
-			var u2 = this.view[b2.x][b2.y+1].walkable;
+			var u2 = this.viewBlock(b2.x, b2.y + 1).walkable;
 		}
 
 		if( u1 && u2 ) {
 			this.hero.moveDown();
 			HERO_MOVED = true;
+			return true;
 		}
 
+		return false;
+	}
+
+	this.fallDown = function(){
+		var b1 = this.hero.fitInCells[0],
+			u1 = this.viewBlock(b1.x, b1.y + 1).empty,
+			b2 = null,
+			u2 = true;
+
+		//If miner stand on 2 blocks
+		if( typeof this.hero.fitInCells[2] !== 'undefined' ) {
+			var b2 = this.hero.fitInCells[2];
+			var u2 = this.viewBlock(b2.x, b2.y + 1).empty;
+		}
+
+		if( u1 && u2 ) {
+			this.hero.moveDown();
+			HERO_MOVED = true;
+			return true;
+		}
+
+		return false;
 	}
 
 	this.moveUp = function() {
-		this.hero.moveUp();
-		HERO_MOVED = true;
+		var b1 = this.hero.fitInCells[1],
+			t1 = this.hero.fitInCells[2],
+		u1 = this.viewBlock(b1.x, b1.y - 1).walkable,
+		b2 = null,
+		u2 = true;
+
+		//If miner stand on 2 blocks
+		if( typeof this.hero.fitInCells[3] !== 'undefined' ) {
+			var b2 = this.hero.fitInCells[3];
+			var u2 = this.viewBlock(b2.x, b2.y - 1).walkable;
+		}
+
+		if( u1 && u2 ) {
+			this.hero.moveUp();
+			HERO_MOVED = true;
+		}
+	}
+
+	this.climbUp = function() {
+		console.log('climb')
+		if( this.hero.fitInCells.length == 2 ) {
+			var head = this.hero.fitInCells[1];
+			var offset = (this.hero.direction == 'right') ? 1 : -1;
+			var climb = this.viewBlock(head.x + offset, head.y + 1 );
+			if( ! climb.walkable ) {
+				//check if we have free space to climp 
+				var
+				s1 = this.viewBlock(head.x + offset, head.y),
+				s2 = this.viewBlock(head.x + offset, head.y-1),
+				s3 = this.viewBlock(head.x, head.y-1);
+
+				console.log( s1.walkable ,s2.walkable , s3.walkable)
+				if( s1.walkable && s2.walkable && s3.walkable ) {
+					this.hero.climbUp();
+				}
+
+			}
+
+		}	
+	}
+
+	this.viewBlock = function(x, y) {
+		if( this.view[x] && this.view[x][y]) {
+			return this.view[x][y];
+		} else {
+			return {};
+		}
 	}
 
 	this.pauseGame = function(e) {
@@ -722,7 +825,11 @@ function PitCraft() {
 			ac.reachable = true;
 			
 			switch( this.hero.look ) {
-				case  1:
+				case 1:
+					//By deafult it set to zero
+					break;
+
+				case  2:
 					ac.y -= 1;
 
 					var bottom_block = this.view[ac.x][ac.y+1];
@@ -732,22 +839,52 @@ function PitCraft() {
 					}
 					break;
 
-				case -1:
-					ac.y += 1;
-					break;
-
-				case  2:
+				case  3:
 					ac.y -= 1;
 					ac.x +=  ( dir == 'right' ) ? -1 : 1;
 					break;
 
+				case -1:
+					ac.y += 1;
+					break;
+
 				case -2:
+					ac.y += 2;
+					break;				
+
+				case -3:
 					ac.y += 2;
 					ac.x +=  ( dir == 'right' ) ? -1 : 1;
 					break;
 			}
 
 			this.hero.activeCell = ac;
+
+			//Check falling
+			var b1 = this.hero.fitInCells[0];
+			var f1 = this.viewBlock(b1.x, b1.y + 1).empty;
+			var f2 = true;
+			if( this.hero.fitInCells.length > 2 ) {
+				b2 = this.hero.fitInCells[3];
+				f2 = this.viewBlock(b2.x, b2.y + 1).empty;
+			}
+
+			if( f1 && f2 ) {
+				//Check maybe we on stairs
+				if( this.viewBlock(b1.x, b1.y).type != 'stairs' )
+					this.isFalling = true;
+			}
+		}
+
+		if( this.isFalling ) {
+			var t = new Date().getTime();
+			if( t > this.lastFallFrame + this.fallTimeout ) {
+				if( ! this.fallDown() ) {
+					this.isFalling = false;
+				} else {
+					this.lastFallFrame = t;
+				}
+			}
 		}
 	}
 
@@ -813,10 +950,10 @@ function PitCraft() {
 })()
 
 Hero = function() {
-	this.x = 380;
+	this.x = 400;
 	this.y = 240;
 
-	this.walkSpeed = 20;
+	this.walkSpeed = 40;
 	this.runSpeed = 40;
 
 	this.speed = this.walkSpeed;
@@ -828,7 +965,7 @@ Hero = function() {
 	this.headH   = 0.8 * this.cellSize;
 	this.half   = this.cellSize/2;
 	
-	this.look = 0;
+	this.look = 1;
 
 
 	var RIGHT = 'right',
@@ -839,11 +976,12 @@ Hero = function() {
 
 	this.sprites = [];
 
-	this.sprites['miner_0'] = $('miner_0');
-	this.sprites['miner_1'] = $('miner_1');
-	this.sprites['miner_2'] = $('miner_2');
+	this.sprites['miner_1'] = $('miner_0');
+	this.sprites['miner_2'] = $('miner_1');
+	this.sprites['miner_3'] = $('miner_2');
 	this.sprites['miner_m1'] = $('miner_m1');
 	this.sprites['miner_m2'] = $('miner_m2');
+	this.sprites['miner_m3'] = $('miner_m2');
 
 	this.draw = function() {
 
@@ -864,63 +1002,20 @@ Hero = function() {
 
 		cxt.restore();
 
-		return;
-		
-		cxt.fillStyle = '#333';
-		cxt.fillRect(
-			this.x,
-			this.y - this.tall,
-			this.cellSize,
-			this.tall
-		);
-
-		cxt.save();
-
-		cxt.translate(this.x + this.half, this.y - 1.45 * this.cellSize );
-
-		var angles = {
-			'-2': - Math.PI / 2.2,
-			'-1' : - Math.PI / 6,
-			'0': 0,
-			'1' : Math.PI / 6,
-			'2' : Math.PI / 2.2
-		}
-
-		var angle = angles[this.look]
-
-		if( this.direction == 'right') {
-			angle = - angle
-		}
-
-		cxt.rotate( angle );
-
-		cxt.fillStyle = '#fc0';
-		cxt.fillRect(
-			this.headH/ -2,
-			this.headW/-2,
-			this.headH,
-			this.headW
-		);
-
-		cxt.fillStyle = '#333';
-		if(this.direction == 'left') {
-			cxt.fillRect( this.headW/-2 + 4, this.headH/-2 + 4,8,8);
-		}
-		else {
-			cxt.fillRect(4,this.headH/-2 + 4,8,8);	
-		}
-		cxt.restore();
-
-		
-		
 	}
 
 	this.lookUp = function() {
-		if( this.look <  2) this.look++;
+		if( this.look == -1)
+			this.look = 1;
+		else if(this.look < 3)
+			this.look++;
 	}
 
 	this.lookDown = function() {
-		if( this.look > -2) this.look--;
+		if( this.look == 1)
+			this.look = -1;
+		else if(this.look > -3)
+			this.look--;
 	}
 
 	this.moveUp = function() {
@@ -931,12 +1026,22 @@ Hero = function() {
 		this.y += 40;
 	}
 
+	
 	this.moveLeft = function() {
 		this.x -= this.speed;
 	}
 
 	this.moveRight = function() {
 		this.x += this.speed;
+	}
+
+	this.climbUp = function() {
+		if( this.direction == 'right') {
+			this.x += this.speed;
+		} else {
+			this.x -= this.speed;
+		}
+		this.y -= 40;
 	}
 }
 
@@ -952,8 +1057,20 @@ Block = function(type) {
 	LEAF  = 6,
 	TORCH = 7;
 	this.walkable = false;
-	if( this.type == 'air' || this.type == 'pit') {
+	this.empty = false;
+
+	if( this.type == 'air' || 
+		this.type == 'pit' ||
+		this.type == 'stairs' ||
+		this.type == 'torch'
+		) {
 		this.walkable = true;
+	}
+
+	if( this.type == 'air' || 
+		this.type == 'pit'
+		) {
+		this.empty = true;
 	}
 
 }  
