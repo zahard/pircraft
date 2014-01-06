@@ -39,13 +39,13 @@ function PitCraft() {
 
 
 	this.prevDayLight = 0.7 // up to 0.8
-	this.dayLight = 0.8 // up to 0.8
+	this.dayLight = 0.1 // up to 0.8
 
 	this.hero = new Hero();
 
 	this.keyPressed = false;
 
-	this.blockInHand = 'stairs';
+	this.blockInHand = 'dirt';
 
 	this.lastFallFrame = 0;
 	this.fallTimeout = 50;
@@ -60,9 +60,8 @@ function PitCraft() {
 		//Start game
 		this.animate();
 		
-		this.dayLight = 0.8
 
-		//this.addLight();
+		this.addLight();
 
 		/*
 		setInterval(function() {
@@ -113,17 +112,23 @@ function PitCraft() {
 			}
 		}
 
-		for( var x = 2; x < 6; x++) {
+		for( var x = 2; x < 7; x++) {
 			for( var y = 6; y <= 7; y++) {
 				this.view[x][y] = new Block('pit');
 			}
 		}
 
 		for( var x = 11; x < 14; x++) {
-			for( var y = 6; y <= 7; y++) {
+			for( var y = 7; y <= 7; y++) {
 				this.view[x][y] = new Block('pit');
 			}
 		}
+
+		
+		for( var y = 8; y <= 12; y++) {
+			this.view[10][y] = new Block('dirt');
+		}
+		
 
 
 		for( var x = 17; x < 24; x++) {
@@ -169,21 +174,93 @@ function PitCraft() {
 		this.view[19][3] = new Block('leaf');
 	*/
 
+		
+		//Update visible
+		for(var x = 0; x < 24; x += 1) {
+			for(var y = 0; y < 12; y += 1) {
+				var block = this.viewBlock(x,y);
+				if( block.type == 'air' ) {
+					this.updateVisibility({x:x,y:y})
+				}
+			}			
+		}
+
 		this.lights = [];
 
 		this.view[7][5] = new Block('torch');
+		this.view[7][5].open = true;
 		this.lights.push({
 			x:7,y:5
 		});
 
-	
+
+		for( var x = 18; x < 22; x++) {
+			for( var y = 8; y < 11; y++) {
+				this.view[x][y] = new Block('pit');
+			}
+		}
+		this.view[19][7] = new Block('pit');
+		this.view[20][7] = new Block('pit');
+
+
+		for(var x = 0; x < 24; x += 1) {
+			for(var y = 0; y < 12; y += 1) {
+				this.drawBlock(x,y);
+			}
+		}
+
+		Block.defaultOpen = true;
+
+	}
+
+	this.worldLeft = [];
+	this.worldRight = [];
+
+	this.shiftWorldRight = function(){
+		var f = this.view.shift();
+		this.worldLeft.push(f);
+
+		var line = [];
+		var wr = this.worldRight.shift();
+		if( wr ) {
+			line = wr;
+		} else {
+			for(var i =0; i < 12; i++){
+				line.push( new Block('dirt') );
+			}
+		}
+
+		this.view.push(line);
 
 		for(var x = 0; x < 24; x += 1) {
 			for(var y = 0; y < 12; y += 1) {
 				this.drawBlock(x,y);
 			}			
 		}
+	}
 
+
+	this.shiftWorldLeft = function(){
+		var f = this.view.pop();
+		this.worldRight.unshift(f);
+
+		var line = [];
+		var wl = this.worldLeft.pop();
+		if( wl ) {
+			line = wl;
+		} else {
+			for(var i =0; i < 12; i++){
+				line.push( new Block('dirt') );
+			}
+		}
+
+		this.view.unshift(line);
+
+		for(var x = 0; x < 24; x += 1) {
+			for(var y = 0; y < 12; y += 1) {
+				this.drawBlock(x,y);
+			}			
+		}
 	}
 
 	this.redrawAir = function() {
@@ -200,6 +277,12 @@ function PitCraft() {
 
 	this.drawBlock = function(x,y) {
 		var block = this.view[x][y];
+
+		if( ! block.open ) {
+			map.fillStyle = '#26333A';
+			map.fillRect(this.cellSize*x,this.cellSize*y,this.cellSize,this.cellSize);
+			return;
+		}
 
 		if( block.type == 'stairs') {
 			map.fillStyle = '#a82';
@@ -222,15 +305,17 @@ function PitCraft() {
 				//map.strokeRect(this.cellSize*x,this.cellSize*y,this.cellSize,this.cellSize);
 				map.fillRect(this.cellSize*x,this.cellSize*y,this.cellSize,this.cellSize);
 			} else if( block.type == 'pit') {
-				map.fillStyle = '#76593C';
+				//map.fillStyle = '#76593C';
+				map.fillStyle = this.getBlockColor(block.type,x,y);
 				map.lineWidth = 1;
 				//map.strokeRect(this.cellSize*x,this.cellSize*y,this.cellSize,this.cellSize);
 				map.fillRect(this.cellSize*x,this.cellSize*y,this.cellSize,this.cellSize);
 			} else {
-				map.fillStyle = this.getBlockColor(block.type,y);
+				map.fillStyle = this.getBlockColor(block.type,x,y);
 				map.fillRect(this.cellSize*x,this.cellSize*y,this.cellSize,this.cellSize);
 			}
-			map.fillStyle = this.getBlockColor(block.type,y);
+
+			map.fillStyle = this.getBlockColor(block.type,x,y);
 			map.fillRect(this.cellSize*x + 1,this.cellSize*y + 1,this.cellSize - 2,this.cellSize - 2);
 		}
 	}
@@ -256,36 +341,241 @@ function PitCraft() {
 		this.addLight();
 	}
 
+	this.recalculateLight = function(){
+		for(var x = 0; x < 24; x += 1) {
+			for(var y = 0; y < 12; y += 1) {
+				var block = this.view[x][y];
+				if( block.empty ) {
+					block.brightness = 0.1;
+					this.drawBlock(x,y);
+				}
+			}			
+		}
+		this.addLight();
+	}
+
 	this.addLight = function() {
-		// x7  y5
-		var l, c, min_y, y, cells = [];
 		
+		// x7  y5
+		var l, c,x, min_y, y, d,  sx,sy,cells = [];
+		var iteration;
+
+		var directions = [
+			{x: 0,y:-1},
+			{x: 0,y: 1},
+			{x:-1,y: 0},
+			{x: 1,y: 0}
+		]
 		for(var n in this.lights ) {
+
 			l = this.lights[n];
 			
+			for( var dir in directions ) {
+
+				d = directions[dir];
+
+				for( var level =1 ; level <= 8; level += 1 ) {
+					var brightness = (9 - level) * 0.1;
+					var orto_length = 8 - level;
+
+					x = l.x + d.x * level;
+					y = l.y + d.y * level;
+
+					var beamCell = this.viewBlock(x,y);
+					if( ! beamCell.walkable ) {
+						break;
+					}
+
+					if( beamCell.setBrightness( brightness ) ) {
+						
+						cells.push({ 
+							x: x, 
+							y: y, 
+							brightness : brightness,
+							type: beamCell.type
+						});
+					}
+
+					orto_x = Math.abs(d.y);
+					orto_y = Math.abs(d.x);
+
+					for(var sub_dir = 0; sub_dir <=1 ; sub_dir++) {
+						//Switch direction from tight to left
+						if( sub_dir == 1 ) {
+							orto_x = -orto_x;
+							orto_y = -orto_y;
+						}
+
+						for( orto = 1; orto <= orto_length; orto++ ) {
+						
+							sx = l.x + d.x * level + orto_x * orto;
+							sy = l.y + d.y * level + orto_y * orto; 
+
+							var subBeamCell = this.viewBlock(sx, sy);
+							
+							if( ! subBeamCell.walkable ) {
+								break;
+							}
+
+							sub_brightness = brightness - orto * 0.1;
+							if( sub_brightness < 0.1 )
+								sub_brightness = 0.1;
+
+							if( subBeamCell.setBrightness( sub_brightness ) ) {
+								cells.push({ 
+									x: sx, 
+									y: sy, 
+									brightness : sub_brightness,
+									type: subBeamCell.type
+								});
+							}
+						}
+					}
+
+
+				}
+
+			}
+
+			/*
 			for( var level = 1; level <= 8; level++) {
+				
 				min_y = l.y - level;
 				y = l.y;
 				go_down = false;
 				iteration = 0;
 				for( var x = l.x - level; x <= l.x + level; x++ ) {
+					
+					brightness = (9 - level) * 0.1;
 
-					if( this.view[x] && this.view[x][y] && this.view[x][y].walkable == true)  {
+					if( this.viewBlock(x,y).empty == true &&
+						brightness > this.viewBlock(x,y).brightness )  {
 						var s = { x: x, y: y };						
 						var r = this.findPath(s,l)
 						if( r ) {
-							cells.push( { x:s.x, y: s.y, level: level, type: this.view[x][y].type} );
+							cells.push({ 
+								x:s.x, 
+								y: s.y, 
+								brightness : brightness,
+								type: this.view[x][y].type
+							});
 						}
 					}
 
 					if( y != l.y ) {
-						if( this.view[x] && this.view[x][y+iteration*2] && this.view[x][y+iteration*2].walkable == true) {
+
+						if( this.viewBlock(x, y + iteration * 2).empty == true &&
+							brightness > this.viewBlock(x,y + iteration * 2).brightness ) {
+
 							//Check if we have straight way to light source
 							var s = { x: x, y: (y + iteration * 2) };						
 
 							var r = this.findPath(s,l)
 							if( r ) {
-								cells.push( { x:s.x, y: s.y, level: level, type: this.view[x][y+iteration*2].type } );
+								cells.push({ 
+									x:s.x,
+									y: s.y,
+									brightness : brightness,
+									type: this.view[x][y+iteration*2].type 
+								});
+							}
+
+						}
+					}
+
+					if( y == min_y ) {
+						go_down = true;
+					}
+
+					if( go_down ) {
+						y++;
+						iteration--;
+					} else {
+						y--;
+						iteration++;
+					}
+
+				}
+
+			}*/
+
+			
+			var cl;
+			var brightness;
+			for( var i in cells ) {
+				c = cells[i];
+				
+				brightness = c.brightness;
+
+				if( c.type == 'air' ) {
+					if( brightness < this.dayLight) {
+						brightness = this.dayLight;
+					}
+				}
+
+				if( c.type == 'air' ) {
+					color = HSVtoRGB( 0.5, 0.5, brightness);
+				} else {
+					color = HSVtoRGB( 0.05, 0.5, brightness);
+				}
+
+				map.fillStyle = color;
+				map.fillRect( this.cellSize * c.x, this.cellSize * c.y, this.cellSize, this.cellSize );
+
+				this.viewBlock(c.x,c.y).brightness = brightness;
+				
+			}
+		}
+
+	}
+
+	this.addLight__old = function() {
+		// x7  y5
+		var l, c, min_y, y, cells = [];
+		var iteration;
+		for(var n in this.lights ) {
+			l = this.lights[n];
+			
+			for( var level = 1; level <= 8; level++) {
+				
+				min_y = l.y - level;
+				y = l.y;
+				go_down = false;
+				iteration = 0;
+				for( var x = l.x - level; x <= l.x + level; x++ ) {
+					
+					brightness = (9 - level) * 0.1;
+
+					if( this.viewBlock(x,y).empty == true &&
+						brightness > this.viewBlock(x,y).brightness )  {
+						var s = { x: x, y: y };						
+						var r = this.findPath(s,l)
+						if( r ) {
+							cells.push({ 
+								x:s.x, 
+								y: s.y, 
+								brightness : brightness,
+								type: this.view[x][y].type
+							});
+						}
+					}
+
+					if( y != l.y ) {
+
+						if( this.viewBlock(x, y + iteration * 2).empty == true &&
+							brightness > this.viewBlock(x,y + iteration * 2).brightness ) {
+
+							//Check if we have straight way to light source
+							var s = { x: x, y: (y + iteration * 2) };						
+
+							var r = this.findPath(s,l)
+							if( r ) {
+								cells.push({ 
+									x:s.x,
+									y: s.y,
+									brightness : brightness,
+									type: this.view[x][y+iteration*2].type 
+								});
 							}
 
 						}
@@ -311,14 +601,26 @@ function PitCraft() {
 			var brightness;
 			for( var i in cells ) {
 				c = cells[i];
-				brightness = (9 - c.level) * 0.1;
-				if( brightness < this.dayLight) {
-					brightness = this.dayLight;
+				
+				brightness = c.brightness;
+
+				if( c.type == 'air' ) {
+					if( brightness < this.dayLight) {
+						brightness = this.dayLight;
+					}
 				}
-				color = HSVtoRGB( 0.5, c.type == 'air' ?  0.5: 0.1, brightness);
-			
+
+				if( c.type == 'air' ) {
+					color = HSVtoRGB( 0.5, 0.5, brightness);
+				} else {
+					color = HSVtoRGB( 0.05, 0.5, brightness);
+				}
+
 				map.fillStyle = color;
 				map.fillRect( this.cellSize * c.x, this.cellSize * c.y, this.cellSize, this.cellSize );
+
+				this.viewBlock(c.x,c.y).brightness = brightness;
+				
 			}
 		}
 
@@ -332,13 +634,13 @@ function PitCraft() {
 			//cehck vertical line
 			if( p1.y > p2.y) {
 				for(var y = p1.y-1; y > p2.y; y--) {
-					if( this.view[p1.x][y].type != 'air') {
+					if( ! this.view[x][y].empty ) {
 						return false;
 					}
 				}
 			} else {
 				for(var y = p1.y+1; y < p2.y; y++) {
-					if( this.view[p1.x][y].type != 'air') {
+					if( ! this.view[x][y].empty) {
 						return false;
 					}
 				}
@@ -349,13 +651,13 @@ function PitCraft() {
 			y = p1.y;
 			if( p1.x < p2.x) {
 				for(var x = p1.x+1; x < p2.x ; x++) {
-					if( this.view[x][y].type != 'air') {
+					if( ! this.view[x][y].empty ) {
 						return false;
 					}
 				}
 			} else {
 				for(var x = p1.x-1; x > p2.x; x--) {
-					if( x >= 0 && this.view[x][y].type != 'air') {
+					if( x >= 0 && ! this.view[x][y].empty ) {
 						return false;
 					}
 				}
@@ -367,14 +669,14 @@ function PitCraft() {
 				if( p1.x < p2.x) {
 					for(var y = p1.y-1; y > p2.y; y--) {
 						if(x != p2.x) x++;
-						if( this.view[x][y].type != 'air') {
+						if( ! this.view[x][y].empty ) {
 							return false;
 						}
 					}
 				} else {
 					for(var y = p1.y-1; y > p2.y; y--) {
 						if(x != p2.x) x--;
-						if( this.view[x][y].type != 'air') {
+						if( ! this.view[x][y].empty ) {
 							return false;
 						}
 					}
@@ -385,7 +687,7 @@ function PitCraft() {
 				if( p1.x < p2.x) {
 					for(var y = p1.y+1; y < p2.y; y++) {
 						if(x != p2.x) x++;
-						if( this.view[x][y].type != 'air') {
+						if( ! this.view[x][y].empty ) {
 							return false;
 						}
 					}
@@ -396,7 +698,7 @@ function PitCraft() {
 						if(x != p2.x) x--;
 
 
-						if( this.view[x][y].type != 'air') {
+						if( ! this.view[x][y].empty ) {
 							return false;
 						}
 					}
@@ -408,12 +710,22 @@ function PitCraft() {
 		return true;
 	}
 
-	this.getBlockColor = function(cell,y) {
+	this.getBlockColor = function(cell,x,y) {
 		if( cell == 'air') {
-			return HSVtoRGB( 0.5, 0.5, this.dayLight);
+
+			var br = this.viewBlock(x,y).brightness;
+			if( br < this.dayLight ) {
+				br = this.dayLight;
+			}
+
+			return HSVtoRGB( 0.5, 0.5, br);
+
+
 		} else if( cell == 'pit') {
-			return HSVtoRGB( 0.05, 0.5, 0.6);
-			//return HSVtoRGB( 0.5, 0.1, 0.7);
+			var br = this.viewBlock(x,y).brightness;
+			return HSVtoRGB( 0.05, 0.5, br);
+			//return HSVtoRGB( 0.05, 0.5, 0.6);
+			
 		}
 		 else {
 			return this.colors[cell];
@@ -427,19 +739,89 @@ function PitCraft() {
 		var old = this.view[ac.x][ac.y];
 		if( old.type == 'air' || old.type == 'pit') {
 			var block = new Block( this.blockInHand );
+
+			if( block.brightness < old.brightness ) {
+				block.brightness = old.brightness
+			}
+
 			this.view[ac.x][ac.y] = block;
 			this.drawBlock(ac.x,ac.y);
+
+			if( block.type == 'torch') {
+				this.lights.push(ac);
+				this.addLight();
+			}
 		}
-		//this.addLight();
+
+		this.recalculateLight();
 	}
 
 	this.hitBlock = function() {
 		if( ! this.hero.activeCell || ! this.hero.activeCell.reachable ) return;
 		
 		var ac = this.hero.activeCell;
-		this.view[ac.x][ac.y] = new Block( ac.y < 6 ? 'air' : 'pit');
+		var block = new Block( ac.y < 6 ? 'air' : 'pit');
+		var old = this.view[ac.x][ac.y];
+		var old_bright = old.brightness;
+		if( block.brightness < old_bright ) {
+			block.brightness = old_bright
+		}
+
+		this.view[ac.x][ac.y] = block;
+
+		this.updateVisibility(ac);
+
 		this.drawBlock(ac.x,ac.y);
-		//this.addLight();		
+
+		if( old.type == 'torch') {
+			var newLights = [];
+			for(var i in this.lights ) {
+				if( this.lights[i].x != ac.x && this.lights[i].y != ac.y ) {
+					newLights.push(this.lights[i]);
+				}
+			}
+			this.lights = newLights;
+			this.recalculateLight();
+		}
+	}
+
+	this.updateVisibility = function(b) {
+		var centerBlock = this.viewBlock(b.x ,b.y);
+		
+		centerBlock.open = true;
+
+		var check = [
+			{x: b.x, y: b.y-1},
+			{x: b.x, y: b.y+1},
+			{x: b.x-1, y: b.y},
+			{x: b.x+1, y: b.y}
+		];
+
+		var block;
+		var max_brightness = 0.1
+
+
+		for(var i in check ) {
+			block = this.viewBlock( check[i].x, check[i].y );
+			if( block.brightness > max_brightness + 0.1) {
+				max_brightness = block.brightness - 0.1;
+			}
+
+			if( block.type && ! block.open ) {
+				block.open = true;
+				this.drawBlock( check[i].x, check[i].y )
+
+				if( block.walkable ) {
+					this.updateVisibility({
+						x: check[i].x,
+						y: check[i].y
+					});
+				}
+			}
+		}
+
+		centerBlock.brightness = max_brightness;
+		
 	}
 
 	this.addListeners = function() {
@@ -486,6 +868,9 @@ function PitCraft() {
 					break;
 				case 51: // 3
 					_this.blockInHand = 'stairs';
+					break;
+				case 52: // 4
+					_this.blockInHand = 'torch';
 					break;
 
 
@@ -598,7 +983,15 @@ function PitCraft() {
 			u2 = this.viewBlock(b2.x + 1, b2.y).walkable;
 
 		if( u1 && u2  ||  this.hero.fitInCells.length > 2) {
+
 			this.hero.moveRight();
+			/*
+			if( b1.x < 18) {
+				this.hero.moveRight();
+			} else {
+				this.shiftWorldRight();
+			}*/
+
 			HERO_MOVED = true;
 		}
 	}
@@ -611,6 +1004,12 @@ function PitCraft() {
 
 		if( u1 && u2  ||  this.hero.fitInCells.length > 2) {
 			this.hero.moveLeft();
+			/*
+			if( b1.x > 3 ) {
+				this.hero.moveLeft();
+			} else {
+				this.shiftWorldLeft();
+			}*/
 			HERO_MOVED = true;
 		}
 	}
@@ -677,7 +1076,6 @@ function PitCraft() {
 	}
 
 	this.climbUp = function() {
-		console.log('climb')
 		if( this.hero.fitInCells.length == 2 ) {
 			var head = this.hero.fitInCells[1];
 			var offset = (this.hero.direction == 'right') ? 1 : -1;
@@ -689,7 +1087,6 @@ function PitCraft() {
 				s2 = this.viewBlock(head.x + offset, head.y-1),
 				s3 = this.viewBlock(head.x, head.y-1);
 
-				console.log( s1.walkable ,s2.walkable , s3.walkable)
 				if( s1.walkable && s2.walkable && s3.walkable ) {
 					this.hero.climbUp();
 				}
@@ -891,29 +1288,58 @@ function PitCraft() {
 	this.draw = function() {
 		this.clearCanvas();
 		
-		var c ;
-		
-		/*
-		for(var i in this.hero.fitInCells ) {
-			c = this.hero.fitInCells[i];
-			cxt.save();
-			cxt.strokeStyle = 'red';
-			cxt.lineWidth = 1;
-			cxt.strokeRect(this.cellSize*c.x,this.cellSize*c.y,this.cellSize,this.cellSize);
-			cxt.fillStyle = 'red';
-			cxt.globalAlpha = 0.2;
-			cxt.fillRect(this.cellSize*c.x,this.cellSize*c.y,this.cellSize,this.cellSize);
-			cxt.restore();
-			
-		} */
-
 		if( this.hero.activeCell ) {
-			c = this.hero.activeCell
+			var c = this.hero.activeCell
 			var color = c.reachable ? 'green' : 'orange';
 			cxt.save();
-			cxt.strokeStyle = color
+			cxt.strokeStyle = color;
 			cxt.lineWidth = 1;
-			cxt.strokeRect(this.cellSize*c.x,this.cellSize*c.y,this.cellSize,this.cellSize);
+			//cxt.strokeRect(this.cellSize*c.x,this.cellSize*c.y,this.cellSize,this.cellSize);
+
+			var x = this.cellSize*c.x;
+			var y = this.cellSize*c.y;
+			var x2 = this.cellSize * (c.x+1);
+			var y2 = this.cellSize * (c.y+1);
+
+			cxt.beginPath();
+			cxt.lineWidth = 2;
+			
+			cxt.moveTo( x, y );
+			cxt.lineTo( x+10, y );
+			cxt.moveTo( x, y );
+			cxt.lineTo( x, y+10);
+
+			cxt.moveTo( x, y2 );
+			cxt.lineTo( x+10, y2 );
+			cxt.moveTo( x, y2 );
+			cxt.lineTo( x, y2-10);
+
+			cxt.moveTo( x2, y );
+			cxt.lineTo( x2-10, y );
+			cxt.moveTo( x2, y );
+			cxt.lineTo( x2, y+10);
+
+			cxt.moveTo( x2, y2 );
+			cxt.lineTo( x2-10, y2 );
+			cxt.moveTo( x2, y2 );
+			cxt.lineTo( x2, y2-10);
+
+			cxt.closePath();
+			cxt.stroke();
+
+			cxt.strokeStyle = '#fff';
+			cxt.beginPath();
+
+			cxt.moveTo( x + 20, y + 14);
+			cxt.lineTo( x + 20, y + 26);
+
+			cxt.moveTo( x + 14, y + 20);
+			cxt.lineTo( x + 26, y + 20);
+
+			cxt.closePath();
+			cxt.stroke();
+
+
 			cxt.fillStyle = color;
 			cxt.globalAlpha = 0.2;
 			cxt.fillRect(this.cellSize*c.x,this.cellSize*c.y,this.cellSize,this.cellSize);
@@ -1056,15 +1482,22 @@ Block = function(type) {
 	WOOD  = 5,
 	LEAF  = 6,
 	TORCH = 7;
+	this.open = Block.defaultOpen;
 	this.walkable = false;
 	this.empty = false;
+	this.brightness = 0.1;
 
+	
 	if( this.type == 'air' || 
 		this.type == 'pit' ||
 		this.type == 'stairs' ||
 		this.type == 'torch'
 		) {
 		this.walkable = true;
+	}
+
+	if( this.type == 'torch') {
+		this.brightness = 0.8;
 	}
 
 	if( this.type == 'air' || 
@@ -1074,5 +1507,14 @@ Block = function(type) {
 	}
 
 }  
+Block.prototype.setBrightness = function(b){
+	if( b > this.brightness ) {
+		this.brightness = b;
+		return true;
+	}
+	return false;
+}
+
+Block.defaultOpen = false;
 
 
