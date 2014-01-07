@@ -3,8 +3,9 @@ var cxt,map;
 //GLOBALS
 var RIGHT_PRESSED = false,
 	LEFT_PRESSED  = false,
-	HERO_MOVED = false,
+	HERO_MOVED = true,
 	SHIFT_PRESSED = false,
+	NEED_UPDATE = true,
 	JUMP_PRESSED  = false;
 
 (function(){
@@ -19,8 +20,15 @@ function PitCraft() {
 		canvas = $("canvas"),
 		mCanvas = $("mapCanvas");
 
+	this.mainCanvas = $("canvas");
+	this.mapCanvas = $("mapCanvas");
+
+	this.sprites = [];
+
+	this.sprites['lamp'] = $('lamp');
+
 	this.width  = 960;
-	this.height = 480;
+	this.height = 960;
 
 	this.cellSize = 40;
 	this.cellsX = this.width  / this.cellSize;
@@ -43,7 +51,11 @@ function PitCraft() {
 
 	this.hero = new Hero();
 
-	this.keyPressed = false;
+	this.keyPressed = false; // keyUp
+	this.keyPushed = false;  // keyDown
+
+
+	this.movePressed = 0;
 
 	this.blockInHand = 'dirt';
 
@@ -105,6 +117,12 @@ function PitCraft() {
 			}			
 		}
 
+		for(var x = 0; x < 24; x += 1) {
+			for(var y = 12; y < 24; y += 1) {
+				cell = new Block('dirt');
+				this.view[x][y] = cell;
+			}			
+		}
 			
 		for( var x = 2; x < 14; x++) {
 			for( var y = 8; y < 11; y++) {
@@ -154,13 +172,15 @@ function PitCraft() {
 		this.view[20][0] = new Block('air');
 
 
+			
 		/*
-		this.view[7][3] = new Block('stone');
+		this.view[8][2] = new Block('stone');
 		this.view[8][3] = new Block('stone');
-		this.view[9][3] = new Block('stone');
-		this.view[10][3] = new Block('stone');
-		this.view[11][3] = new Block('stone');
-		*/	
+		this.view[8][4] = new Block('stone');
+		this.view[8][5] = new Block('stone');
+		this.view[8][6] = new Block('stone');
+		*/
+			
 		
 		/*
 		this.view[18][5] = new Block('wood');
@@ -177,7 +197,7 @@ function PitCraft() {
 		
 		//Update visible
 		for(var x = 0; x < 24; x += 1) {
-			for(var y = 0; y < 12; y += 1) {
+			for(var y = 0; y < 24; y += 1) {
 				var block = this.viewBlock(x,y);
 				if( block.type == 'air' ) {
 					this.updateVisibility({x:x,y:y})
@@ -187,10 +207,10 @@ function PitCraft() {
 
 		this.lights = [];
 
-		this.view[7][5] = new Block('torch');
-		this.view[7][5].open = true;
+		this.view[5][3] = new Block('torch');
+		this.view[5][3].open = true;
 		this.lights.push({
-			x:7,y:5
+			x:5,y:3
 		});
 
 
@@ -204,7 +224,7 @@ function PitCraft() {
 
 
 		for(var x = 0; x < 24; x += 1) {
-			for(var y = 0; y < 12; y += 1) {
+			for(var y = 0; y < 24; y += 1) {
 				this.drawBlock(x,y);
 			}
 		}
@@ -315,8 +335,21 @@ function PitCraft() {
 				map.fillRect(this.cellSize*x,this.cellSize*y,this.cellSize,this.cellSize);
 			}
 
-			map.fillStyle = this.getBlockColor(block.type,x,y);
-			map.fillRect(this.cellSize*x + 1,this.cellSize*y + 1,this.cellSize - 2,this.cellSize - 2);
+			if( block.type != 'torch' ) {
+				map.fillStyle = this.getBlockColor(block.type,x,y);
+				map.fillRect(this.cellSize*x + 1,this.cellSize*y + 1,this.cellSize - 2,this.cellSize - 2);
+			} else {
+
+				var type = ( y < 7 ) ? 'air':'pit';
+				map.fillStyle = this.getBlockColor(type,x,y);
+				map.fillRect(this.cellSize*x,this.cellSize*y,this.cellSize,this.cellSize);
+
+				map.drawImage( 
+					this.sprites['lamp'],
+					this.cellSize*x,
+					this.cellSize*y
+				);
+			}
 		}
 	}
 
@@ -365,7 +398,8 @@ function PitCraft() {
 			{x: 0,y: 1},
 			{x:-1,y: 0},
 			{x: 1,y: 0}
-		]
+		];
+
 		for(var n in this.lights ) {
 
 			l = this.lights[n];
@@ -386,7 +420,7 @@ function PitCraft() {
 						break;
 					}
 
-					if( beamCell.setBrightness( brightness ) ) {
+					if( beamCell.type && beamCell.setBrightness( brightness ) ) {
 						
 						cells.push({ 
 							x: x, 
@@ -421,7 +455,7 @@ function PitCraft() {
 							if( sub_brightness < 0.1 )
 								sub_brightness = 0.1;
 
-							if( subBeamCell.setBrightness( sub_brightness ) ) {
+							if( subBeamCell.type && subBeamCell.setBrightness( sub_brightness ) ) {
 								cells.push({ 
 									x: sx, 
 									y: sy, 
@@ -429,75 +463,58 @@ function PitCraft() {
 									type: subBeamCell.type
 								});
 							}
-						}
-					}
+
+							// Try Diff light from bith sides of side beam
+							// Beam is birght enough for reflecting
+							if( sub_brightness > 0.2) {
+
+								//If subbeam is vertical
+								if( d.y == 0 ) {
+									dx = 1;
+									dy = 0;	
+								//If subbeam is horizontal
+								} else {
+									dx = 0;
+									dy = 1;	
+								}
 
 
-				}
+								var cnx, cny;
+								for( var cn = 0; cn <=1; cn++) {
+									cnx = sx + dx;
+									cny = sy + dy;
+									if( cn == 1) {
+										cnx = sx - dx;
+										cny = sy - dy;
+									}
 
-			}
+									var sideSubBeamCell = this.viewBlock(cnx, cny);
 
-			/*
-			for( var level = 1; level <= 8; level++) {
-				
-				min_y = l.y - level;
-				y = l.y;
-				go_down = false;
-				iteration = 0;
-				for( var x = l.x - level; x <= l.x + level; x++ ) {
-					
-					brightness = (9 - level) * 0.1;
+									if( sx == 9 && sy == 2) {
+										//console.log(sideSubBeamCell, sx, sy, cnx, cny)
+									}
 
-					if( this.viewBlock(x,y).empty == true &&
-						brightness > this.viewBlock(x,y).brightness )  {
-						var s = { x: x, y: y };						
-						var r = this.findPath(s,l)
-						if( r ) {
-							cells.push({ 
-								x:s.x, 
-								y: s.y, 
-								brightness : brightness,
-								type: this.view[x][y].type
-							});
-						}
-					}
+									if( sideSubBeamCell.walkable && sideSubBeamCell.setBrightness( sub_brightness - 0.2) ) {
+										cells.push({ 
+											x: cnx, 
+											y: cny, 
+											brightness : sub_brightness - 0.1,
+											type: sideSubBeamCell.type
+										});
+									}
 
-					if( y != l.y ) {
+								}
 
-						if( this.viewBlock(x, y + iteration * 2).empty == true &&
-							brightness > this.viewBlock(x,y + iteration * 2).brightness ) {
 
-							//Check if we have straight way to light source
-							var s = { x: x, y: (y + iteration * 2) };						
-
-							var r = this.findPath(s,l)
-							if( r ) {
-								cells.push({ 
-									x:s.x,
-									y: s.y,
-									brightness : brightness,
-									type: this.view[x][y+iteration*2].type 
-								});
+								
 							}
 
+
 						}
 					}
-
-					if( y == min_y ) {
-						go_down = true;
-					}
-
-					if( go_down ) {
-						y++;
-						iteration--;
-					} else {
-						y--;
-						iteration++;
-					}
-
 				}
+			}
 
-			}*/
 
 			
 			var cl;
@@ -529,186 +546,7 @@ function PitCraft() {
 
 	}
 
-	this.addLight__old = function() {
-		// x7  y5
-		var l, c, min_y, y, cells = [];
-		var iteration;
-		for(var n in this.lights ) {
-			l = this.lights[n];
-			
-			for( var level = 1; level <= 8; level++) {
-				
-				min_y = l.y - level;
-				y = l.y;
-				go_down = false;
-				iteration = 0;
-				for( var x = l.x - level; x <= l.x + level; x++ ) {
-					
-					brightness = (9 - level) * 0.1;
 
-					if( this.viewBlock(x,y).empty == true &&
-						brightness > this.viewBlock(x,y).brightness )  {
-						var s = { x: x, y: y };						
-						var r = this.findPath(s,l)
-						if( r ) {
-							cells.push({ 
-								x:s.x, 
-								y: s.y, 
-								brightness : brightness,
-								type: this.view[x][y].type
-							});
-						}
-					}
-
-					if( y != l.y ) {
-
-						if( this.viewBlock(x, y + iteration * 2).empty == true &&
-							brightness > this.viewBlock(x,y + iteration * 2).brightness ) {
-
-							//Check if we have straight way to light source
-							var s = { x: x, y: (y + iteration * 2) };						
-
-							var r = this.findPath(s,l)
-							if( r ) {
-								cells.push({ 
-									x:s.x,
-									y: s.y,
-									brightness : brightness,
-									type: this.view[x][y+iteration*2].type 
-								});
-							}
-
-						}
-					}
-
-					if( y == min_y ) {
-						go_down = true;
-					}
-
-					if( go_down ) {
-						y++;
-						iteration--;
-					} else {
-						y--;
-						iteration++;
-					}
-
-				}
-
-			}
-
-			var cl;
-			var brightness;
-			for( var i in cells ) {
-				c = cells[i];
-				
-				brightness = c.brightness;
-
-				if( c.type == 'air' ) {
-					if( brightness < this.dayLight) {
-						brightness = this.dayLight;
-					}
-				}
-
-				if( c.type == 'air' ) {
-					color = HSVtoRGB( 0.5, 0.5, brightness);
-				} else {
-					color = HSVtoRGB( 0.05, 0.5, brightness);
-				}
-
-				map.fillStyle = color;
-				map.fillRect( this.cellSize * c.x, this.cellSize * c.y, this.cellSize, this.cellSize );
-
-				this.viewBlock(c.x,c.y).brightness = brightness;
-				
-			}
-		}
-
-	}
-
-
-	this.findPath = function(p1,p2) {
-
-		if( p1.x == p2.x) {
-			x = p1.x;
-			//cehck vertical line
-			if( p1.y > p2.y) {
-				for(var y = p1.y-1; y > p2.y; y--) {
-					if( ! this.view[x][y].empty ) {
-						return false;
-					}
-				}
-			} else {
-				for(var y = p1.y+1; y < p2.y; y++) {
-					if( ! this.view[x][y].empty) {
-						return false;
-					}
-				}
-			}
-
-		} else if( p1.y == p2.y) {
-			//Cehck horizontal line
-			y = p1.y;
-			if( p1.x < p2.x) {
-				for(var x = p1.x+1; x < p2.x ; x++) {
-					if( ! this.view[x][y].empty ) {
-						return false;
-					}
-				}
-			} else {
-				for(var x = p1.x-1; x > p2.x; x--) {
-					if( x >= 0 && ! this.view[x][y].empty ) {
-						return false;
-					}
-				}
-			}
-		} else {
-
-			if( p1.y > p2.y ) {
-				x = p1.x;
-				if( p1.x < p2.x) {
-					for(var y = p1.y-1; y > p2.y; y--) {
-						if(x != p2.x) x++;
-						if( ! this.view[x][y].empty ) {
-							return false;
-						}
-					}
-				} else {
-					for(var y = p1.y-1; y > p2.y; y--) {
-						if(x != p2.x) x--;
-						if( ! this.view[x][y].empty ) {
-							return false;
-						}
-					}
-				}
-			} else {
-				x = p1.x;
-
-				if( p1.x < p2.x) {
-					for(var y = p1.y+1; y < p2.y; y++) {
-						if(x != p2.x) x++;
-						if( ! this.view[x][y].empty ) {
-							return false;
-						}
-					}
-				} else {
-
-					
-					for(var y = p1.y+1; y < p2.y; y++) {
-						if(x != p2.x) x--;
-
-
-						if( ! this.view[x][y].empty ) {
-							return false;
-						}
-					}
-				} 
-			}
-
-		}
-
-		return true;
-	}
 
 	this.getBlockColor = function(cell,x,y) {
 		if( cell == 'air') {
@@ -776,13 +614,13 @@ function PitCraft() {
 		if( old.type == 'torch') {
 			var newLights = [];
 			for(var i in this.lights ) {
-				if( this.lights[i].x != ac.x && this.lights[i].y != ac.y ) {
+				if( this.lights[i].x != ac.x || this.lights[i].y != ac.y ) {
 					newLights.push(this.lights[i]);
 				}
 			}
 			this.lights = newLights;
-			this.recalculateLight();
 		}
+		this.recalculateLight();
 	}
 
 	this.updateVisibility = function(b) {
@@ -892,7 +730,7 @@ function PitCraft() {
 
 				case 16: //SHIFT
 					SHIFT_PRESSED = false;
-					//_this.hero.speed = _this.hero.walkSpeed;
+					_this.hero.speed = _this.hero.walkSpeed;
 					break;
 
 				case 68: // D
@@ -905,22 +743,25 @@ function PitCraft() {
 					break;
 
 				case 39: // Look RIGHT
+					RIGHT_PRESSED = false;
+					/*
 					if( _this.hero.direction == 'right' || SHIFT_PRESSED ) {
 						_this.moveRight();
 					} else {
 						_this.hero.direction  = 'right';
-					}
+					} */
 
 					break;
 
 				case 37: // Look LEFT
-					
+					LEFT_PRESSED = false;
+					/*
 					if( _this.hero.direction == 'left' || SHIFT_PRESSED ) {
 						_this.moveLeft();
 					} else {
 						_this.hero.direction  = 'left';
 					}
-
+					*/
 					break;
 
 				case 38: //UP
@@ -949,21 +790,31 @@ function PitCraft() {
 			switch( e.keyCode ) {
 				case 16: //SHIFT
 					SHIFT_PRESSED = true;
-					//_this.hero.speed = _this.hero.runSpeed;
+					_this.hero.speed = _this.hero.runSpeed;
 					break;
 
 				case 68: // D 
-					RIGHT_PRESSED = true;
+					//RIGHT_PRESSED = true;
 					break;
 				case 65: // A
-					LEFT_PRESSED = true;
+					//LEFT_PRESSED = true;
 					break;
 
 				case 39: // Look RIGHT
-					//_this.hero.direction = 'right';
+					if( _this.hero.direction == 'left' ) {
+						_this.hero.direction = 'right';
+					} else {
+						RIGHT_PRESSED = true;
+					}
+
 					break;
 				case 37: // Look LEFT
-					//_this.hero.direction = 'left';
+					if( _this.hero.direction == 'right' ) {
+						_this.hero.direction = 'left';
+					} else {
+						LEFT_PRESSED = true;
+					}
+					
 					break;
 
 				case 38: //Look UP
@@ -973,6 +824,7 @@ function PitCraft() {
 					DOWN_PRESSED = true;
 					break;
 			}
+			_this.keyPushed = true;
 		});	
 	}
 
@@ -985,15 +837,11 @@ function PitCraft() {
 		if( u1 && u2  ||  this.hero.fitInCells.length > 2) {
 
 			this.hero.moveRight();
-			/*
-			if( b1.x < 18) {
-				this.hero.moveRight();
-			} else {
-				this.shiftWorldRight();
-			}*/
 
-			HERO_MOVED = true;
+			return true;
 		}
+
+		return false;
 	}
 
 	this.moveLeft = function() {
@@ -1004,14 +852,11 @@ function PitCraft() {
 
 		if( u1 && u2  ||  this.hero.fitInCells.length > 2) {
 			this.hero.moveLeft();
-			/*
-			if( b1.x > 3 ) {
-				this.hero.moveLeft();
-			} else {
-				this.shiftWorldLeft();
-			}*/
-			HERO_MOVED = true;
+			
+			return true;
 		}
+
+		return false;
 	}
 
 	this.moveDown = function() {
@@ -1028,7 +873,6 @@ function PitCraft() {
 
 		if( u1 && u2 ) {
 			this.hero.moveDown();
-			HERO_MOVED = true;
 			return true;
 		}
 
@@ -1042,6 +886,7 @@ function PitCraft() {
 			u2 = true;
 
 		//If miner stand on 2 blocks
+
 		if( typeof this.hero.fitInCells[2] !== 'undefined' ) {
 			var b2 = this.hero.fitInCells[2];
 			var u2 = this.viewBlock(b2.x, b2.y + 1).empty;
@@ -1049,7 +894,6 @@ function PitCraft() {
 
 		if( u1 && u2 ) {
 			this.hero.moveDown();
-			HERO_MOVED = true;
 			return true;
 		}
 
@@ -1123,33 +967,112 @@ function PitCraft() {
 		}
 	}
 
+	this.maxFps = 0;
+	this.minFps = 1000;
 	this.animate = function() {
 		if( _this.isPaused )
 			return;
 
-		_this.update();
-		_this.draw();
+		/*
+		var t = new Date().getTime();
+		if( _this.lastFrame ) {
+			var fps = 1000/ (t - _this.lastFrame);
+			fps = t - _this.lastFrame;
+				
+			var r = false;
+			if( fps > _this.maxFps) {
+				_this.maxFps = fps;
+				r = true;
+			}
+
+			if( fps < _this.minFps) {
+				_this.minFps = fps;
+				r =true;
+			}
+
+			if(r){
+				$('fps').innerText = ( _this.maxFps + _this.minFps) /2;
+			}
+		}
+		_this.lastFrame = t;
+		*/
+
+		if( _this.update() ) {
+			_this.updateViewport();
+			_this.draw();
+		}
+
 		requestAnimationFrame(_this.animate)
+	}
+
+	this.updateViewport = function() {
+		var canvas_y;
+		var y = this.hero.y;
+		
+		if( y <= 280 ) {
+			canvas_y = 0;
+		} else if ( y > 960 - 280 ) {
+			canvas_y = 480;
+		} else {
+			canvas_y = y - 280 ;
+			
+			console.log(y,canvas_y)
+		}
+
+		this.mainCanvas.style.top = -canvas_y + 'px';
+		this.mapCanvas.style.top = -canvas_y + 'px';
+		
 	}
 
 	this.update = function() {
 		
-		NEED_UPDATE = false;
+		var needRedraw = false;
+		
+
 		if( this.keyPressed ) {
 			this.keyPressed = false;
 			NEED_UPDATE = true;
 		}
 
-		if( NEED_UPDATE || HERO_MOVED ) {
+		if( this.keyPushed ) {
+			this.keyPushed = false;
+			NEED_UPDATE = true;
+		}
+
+		if( HERO_MOVED ) {
+			NEED_UPDATE = true;
 			HERO_MOVED = false;
-		
-			if( this.keyPressed ) this.keyPressed = false;
+		}
+
+		var t = new Date().getTime();
+	
+
+		if( NEED_UPDATE || LEFT_PRESSED || RIGHT_PRESSED ) {
+			NEED_UPDATE = false;
 
 			//Move our hero
-			if( LEFT_PRESSED ) {
-				//this.hero.x -= this.hero.speed;
-			} else if( RIGHT_PRESSED ) {
-				//this.hero.x += this.hero.speed;
+
+			if( LEFT_PRESSED || RIGHT_PRESSED ) {
+				
+				if( LEFT_PRESSED ) {
+			
+					this.moveLeft();
+				} else if( RIGHT_PRESSED ) {
+					
+					this.moveRight();
+				}
+
+				if( this.hero.currentFrame == this.hero.framesFreq ) {
+					this.hero.currentFrame = 1;
+					this.hero.runFrame++;
+					if( this.hero.runFrame > 4) {
+						this.hero.runFrame = 1;
+					}
+				}
+				this.hero.currentFrame++;;
+			
+			} else {
+				this.hero.runFrame = 0;
 			}
 
 			// Клетки занятые нашим игроком 
@@ -1258,38 +1181,174 @@ function PitCraft() {
 			this.hero.activeCell = ac;
 
 			//Check falling
-			var b1 = this.hero.fitInCells[0];
-			var f1 = this.viewBlock(b1.x, b1.y + 1).empty;
-			var f2 = true;
-			if( this.hero.fitInCells.length > 2 ) {
-				b2 = this.hero.fitInCells[3];
-				f2 = this.viewBlock(b2.x, b2.y + 1).empty;
+			if( ! this.isFalling ) {
+
+	 			var b1 = this.hero.fitInCells[0];
+				var f1 = this.viewBlock(b1.x, b1.y + 1).empty;
+				var f2 = true;
+				if( this.hero.fitInCells.length > 2 ) {
+					b2 = this.hero.fitInCells[3];
+					f2 = this.viewBlock(b2.x, b2.y + 1).empty;
+				}
+
+				if( f1 && f2 ) {
+					//Check maybe we on stairs
+					if( this.viewBlock(b1.x, b1.y).type != 'stairs' ) {
+						this.isFalling = true;
+					}
+				}
 			}
 
-			if( f1 && f2 ) {
-				//Check maybe we on stairs
-				if( this.viewBlock(b1.x, b1.y).type != 'stairs' )
-					this.isFalling = true;
-			}
+			needRedraw = true;
 		}
 
 		if( this.isFalling ) {
-			var t = new Date().getTime();
 			if( t > this.lastFallFrame + this.fallTimeout ) {
 				if( ! this.fallDown() ) {
 					this.isFalling = false;
 				} else {
 					this.lastFallFrame = t;
 				}
+				NEED_UPDATE = true;
+				needRedraw = true;
 			}
 		}
+
+		return needRedraw;
 	}
 
 	this.draw = function() {
 		this.clearCanvas();
 		
-		if( this.hero.activeCell ) {
-			var c = this.hero.activeCell
+		
+
+		this.hero.draw();
+	}
+
+	
+	this.trigger = function(event) {
+		if( typeof this.subscribers != 'undefined' && typeof this.subscribers[event] != 'undefined' ) {
+			for(var i in this.subscribers[event]) {
+				this.subscribers[event][i].call()
+			}
+		}
+	}
+
+	this.on = function(event, handler) {
+		if( typeof this.subscribers == 'undefined' )
+			this.subscribers = {};
+
+		if( typeof this.subscribers[event] == 'undefined' )
+			this.subscribers[event] = [];
+
+		this.subscribers[event].push(handler);
+	}
+
+	this.clearCanvas = function() {
+		cxt.clearRect(0, 0, this.width, this.height);
+	}
+	
+}
+})()
+
+Hero = function() {
+	this.x = 400;
+	this.y = 240;
+
+	this.walkSpeed = 4;
+	this.runSpeed = 8;
+
+	this.framesFreq = 9;
+	this.currentFrame = 0;
+
+	this.speed = this.walkSpeed;
+	
+	this.cellSize = 40;
+	
+	this.tall   = 1.2 * this.cellSize;
+	this.headW   = 0.7 * this.cellSize;
+	this.headH   = 0.8 * this.cellSize;
+	this.half   = this.cellSize/2;
+	
+	this.look = 1;
+
+
+	var RIGHT = 'right',
+		LEFT = 'left';
+
+	this.direction = RIGHT;
+
+	this.sprites = [];
+
+	this.sprites['miner_legs'] = $('miner_legs');
+	this.sprites['miner_hand'] = $('miner_hand');
+	this.sprites['miner_head'] = $('miner_head');
+
+	this.runFrame = 0;
+
+	this.draw = function() {
+		
+		var img_hand = this.sprites['miner_hand'];
+		var img_legs = this.sprites['miner_legs'];
+		var img_head = this.sprites['miner_head'];
+
+		var sprite_x = this.runFrame * 40;
+		var sprite_y = 0;
+
+		var oss = ( this.look < 0 ) ? 40 : 0;
+
+		var spriteHead_x =  - ( this.look  - 3 ) * 40  - oss;
+
+		
+		cxt.save();
+		
+		
+		//Boby with legs, used us backgound for another part of body
+		this.drawSprite(img_legs, sprite_x, sprite_y)
+
+		//Hand
+		this.drawSprite(img_hand, sprite_x, sprite_y);
+
+
+		//Head
+		this.drawSprite(img_head, spriteHead_x, sprite_y);
+
+
+
+		if( this.activeCell ) {
+			this.drawPointer();
+		}
+
+		cxt.restore();
+
+		
+	}
+
+	this.drawSprite = function( sprite , sx, sy) {
+		var place_x = this.x;
+		var place_y = this.y - this.cellSize * 2;
+
+		cxt.save();
+
+		if (this.direction == 'left' ) {
+			cxt.translate(960, 0);
+			cxt.scale(-1, 1);
+			place_x = 920 - place_x;
+		}
+
+		cxt.drawImage( 
+			sprite,  // Sprie image with body and legs
+			sx, sy, // Sprite position
+			this.cellSize, this.cellSize * 2,  // Sprite image size
+			place_x, place_y, // Place image in this point
+			this.cellSize, this.cellSize * 2 // IMage size on canvas
+		);
+
+		cxt.restore();
+	}
+
+	this.drawPointer = function() {
+		var c = this.activeCell;
 			var color = c.reachable ? 'green' : 'orange';
 			cxt.save();
 			cxt.strokeStyle = color;
@@ -1342,91 +1401,10 @@ function PitCraft() {
 
 			cxt.fillStyle = color;
 			cxt.globalAlpha = 0.2;
+			
 			cxt.fillRect(this.cellSize*c.x,this.cellSize*c.y,this.cellSize,this.cellSize);
-			cxt.restore();	
-		}
 
-		this.hero.draw();
-	}
-
-	
-	this.trigger = function(event) {
-		if( typeof this.subscribers != 'undefined' && typeof this.subscribers[event] != 'undefined' ) {
-			for(var i in this.subscribers[event]) {
-				this.subscribers[event][i].call()
-			}
-		}
-	}
-
-	this.on = function(event, handler) {
-		if( typeof this.subscribers == 'undefined' )
-			this.subscribers = {};
-
-		if( typeof this.subscribers[event] == 'undefined' )
-			this.subscribers[event] = [];
-
-		this.subscribers[event].push(handler);
-	}
-
-	this.clearCanvas = function() {
-		cxt.clearRect(0, 0, this.width, this.height);
-	}
-	
-}
-})()
-
-Hero = function() {
-	this.x = 400;
-	this.y = 240;
-
-	this.walkSpeed = 40;
-	this.runSpeed = 40;
-
-	this.speed = this.walkSpeed;
-	
-	this.cellSize = 40;
-	
-	this.tall   = 1.2 * this.cellSize;
-	this.headW   = 0.7 * this.cellSize;
-	this.headH   = 0.8 * this.cellSize;
-	this.half   = this.cellSize/2;
-	
-	this.look = 1;
-
-
-	var RIGHT = 'right',
-		LEFT = 'left';
-
-
-	this.direction = RIGHT;
-
-	this.sprites = [];
-
-	this.sprites['miner_1'] = $('miner_0');
-	this.sprites['miner_2'] = $('miner_1');
-	this.sprites['miner_3'] = $('miner_2');
-	this.sprites['miner_m1'] = $('miner_m1');
-	this.sprites['miner_m2'] = $('miner_m2');
-	this.sprites['miner_m3'] = $('miner_m2');
-
-	this.draw = function() {
-
-		cxt.save();
-		
-		var sprite = 'miner_' + this.look + '';
-		sprite = sprite.replace('-','m');
-
-		var img = this.sprites[sprite];
-
-		if(this.direction == 'left') {
-			cxt.translate(960, 0);
-			cxt.scale(-1, 1); 
-			cxt.drawImage(img, 920 - this.x, this.y - this.cellSize * 2);
-		} else {
-			cxt.drawImage(img, this.x, this.y - this.cellSize * 2);
-		}
-
-		cxt.restore();
+			cxt.restore();
 
 	}
 
@@ -1516,5 +1494,4 @@ Block.prototype.setBrightness = function(b){
 }
 
 Block.defaultOpen = false;
-
-
+	

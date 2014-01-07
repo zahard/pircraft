@@ -22,6 +22,12 @@
 			
 		}
 
+		#viewport {
+			height: 480px;
+			width: 960px;
+			overflow: hidden;
+			position: absolute;
+		}
 
 		#mapCanvas {
 			z-index:1;
@@ -32,12 +38,14 @@
 	<script type="text/javascript" src="js/PitCraft.js"></script>
 </head>
 <body style="background:#111">
-	<canvas id="canvas"></canvas>
-	<canvas id="mapCanvas"></canvas>
-	<img id="miner_0" src="miner_0.png">
-	<img id="miner_1" src="miner_1.png">
-	<img id="miner_2" src="miner_2.png">
-	<img id="miner_m1" src="miner_m1.png">
-	<img id="miner_m2" src="miner_m2.png">
+	<div id="viewport">
+		<canvas id="canvas" crossOrigin="anonymous" ></canvas>
+		<canvas id="mapCanvas" crossOrigin="anonymous"></canvas>
+	</div>
+	<img id="lamp" src="lamp.png">
+	<img id="miner_head" src="miner_head.png">
+	<img id="miner_legs" src="miner_legs.png">
+	<img id="miner_hand" src="miner_hand.png">
+	<h1 id="fps" style="position: absolute;right: 30px;top: 0;color: #FFF;"></h1>
 </body>
 </htmlq
