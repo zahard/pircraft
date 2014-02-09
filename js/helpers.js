@@ -70,4 +70,15 @@ function HSVtoRGB(h, s, v) {
 	    };
 
 	    return 'rgb('+c.r+','+c.g+','+c.b+')';
+}
+
+/**
+ * Remove object from array. Only for objects/arrays 
+ */
+
+function removeItem(array, obj) {
+	var i = array.indexOf(obj);
+	if( i != -1 ) {
+		array.splice(i,1);
 	}
+}
