@@ -8,7 +8,7 @@ var RIGHT_PRESSED = false,
 	NEED_UPDATE = true,
 	JUMP_PRESSED  = false;
 
-(function(){
+
 
 /*
 window.onbeforeunload = function() {
@@ -40,8 +40,8 @@ function PitCraft() {
 	this.sprites['lamp'] = $('lamp');
 	this.sprites['tiles'] = $('tiles');
 
-	this.dayLight = 3  // up to 8
-	this.hero = new Hero(1200, 480, this);
+	this.dayLight = 2; // up to 8
+	this.hero = new Hero(1040, 480, this);
 
 	//View port is 84 x 60 block ( maximum 7 x 5 chunks showed )
 		
@@ -106,6 +106,8 @@ function PitCraft() {
 
 	Block.game = this;
 
+	this.MapGenerator = new generator(this);
+
 	this.init = function() {	
 		//Listen for mouse events
 		this.addListeners();
@@ -120,6 +122,12 @@ function PitCraft() {
 
 		this.addLight();
 
+
+		this.addEnemies();
+/*
+		setTimeout(function(){
+			_this.testTrees();
+		},500);*/
 
 		/*
 		setInterval(function() {
@@ -141,175 +149,13 @@ function PitCraft() {
 	}
 
 	this.generated = 0;
-	this.caves = 0;
+	
 	this.generateChunk = function(cx,cy) {
 		this.generated++;
-		var chunk = [], cell;
-		
-		var type = 'stone';
-		if( cy <= 0 ) {
-			type = 'air';
-		}
-		zero_type = ( cy == 1 ) ? 'grass' : type;
-		
-		var simple = true;
-		
-		//Osidian
-		addObs = false;
-		if( cy > 5 ) {
-			if( rand(10) == 1 ) {
-				addObs =  true;
-				perChunk = 4;
-				simple = false;
-			}
-		}
-		
-		//Caves 
-		addCaves = false;
-		if( cy > 0 ) {
-
-			if( rand(2) == 1 ) {
-				this.caves++;
-				addCaves = true;
-				simple = false;
-				var cave = this.generateCave();
-			}
-		}
-
-		//Caves 
-		addCliff = false;
-		if( cy > 0 ) {
-			if( rand(5) == 1 ) {
-				addCliff = true;
-				simple = false;
-				var cliff = this.generateCliff();
-			}
-		}
-
-		addLava = false;
-		if( cy == 1 ) {
-			if( rand(2) == 1 ) {
-				addLava = true;
-				simple = false;
-			}
-		}
-
-
-		for(var x = 0; x < this.chunkSize; x += 1) {
-			chunk[x] = [];
-			for(var y = 0; y < this.chunkSize; y += 1) {
-				
-				if( y == 0 ) {
-						chunk[x][y] = new Block(zero_type);	
-				} else {
-					if( cx == 1 && y < 5 ) {
-						chunk[x][y] = new Block('dirt');
-					} else {
-						chunk[x][y] = new Block(type);	
-					}
-				}
-
-				if( addLava ) {
-					if( y > 9 && rand(9) < 3 ) {
-						chunk[x][y] = new Block('lava');
-
-						/*this.lights.push({
-							cx:cx,cy:cy,
-							x:x,y:y
-						});*/
-					}
-				}
-
-				if( addCaves ) {
-					if( cave[x] && cave[x][y]) {
-						chunk[x][y] = cave[x][y];		
-					}
-				}
-
-				if( addCliff ) {
-					if( cliff[x] && cliff[x][y]) {
-						chunk[x][y] = cliff[x][y];		
-					}
-				}
-
-				if( addObs ) {
-					if( rand(20) == 1 ) {
-						chunk[x][y] = new Block('obsidian');		
-					}
-				}					
-			}			
-		}
-
-
-
-
-		return chunk;
+		return this.MapGenerator.createChunk(cx,cy);
 	}
-
-	this.generateCave = function() {
-		var cave = [];
-		var big_cave = rand(4) == 1;
-		if( big_cave ) {
-			cave_w = rand(6,9);
-			cave_h = rand(6,9);
-		} else {
-			cave_w = rand(6);
-			cave_h = rand(6);
-		}
-
-		cave_y = rand(0,11-cave_h);
-		cave_x = rand(0,11-cave_w);
-
-		if( cave_x + cave_w > 11 || cave_y + cave_h > 11) {
-			return this.generateCave();
-		}
-
-		var x_max = cave_x + cave_w;
-		var y_max = cave_y + cave_h;
-		for(var x = cave_x; x < x_max; x++) {
-			cave[x] = [];
-			for(var y = cave_y; y < y_max; y++) {
-				cave[x][y] = new Block('pit');
-			}
-		}
-	
-		return cave;
-
-		var center_x;
-		if( cave_w % 2 ) {
-			center_x = (cave_w+1)/2+cave_x;
-		} else {
-			center_x = cave_w/2+cave_x;
-		}
-
-		var center_y;
-		if( cave_h % 2 ) {
-			center_y = (cave_h+1)/2+cave_y;
-		} else {
-			center_y = cave_h/2+cave_y;
-		}
-	}
-
-
-	this.generateCliff = function() {
-		var cliff = [];
-		for(var x = 0; x < this.chunkSize; x += 1) {
-			cliff[x] = [];
-			for(var y = 0; y < this.chunkSize; y += 1) {
-				if( rand(9) < 5 ) {
-					cliff[x][y] = new Block('pit');
-				} else {
-					if( rand(1) == 1 ) {
-						cliff[x][y] = new Block('stone');
-					} else {
-						cliff[x][y] = new Block('dirt');
-					}
-				}
-
-			}			
-		}
-		return cliff;
-	}
+		
+		
 
 	this.saveWorld = function() {
 		var map = JSON.stringify(this.world)		
@@ -337,18 +183,16 @@ function PitCraft() {
 			}
 		}
 
-				
-
-
-		this.addLightSource( new Block('torch'), 25, 9 );
+		this.addLightSource( new Block('torch'), 27, 7 );
+		this.addLightSource( new Block('torch'), 34, 11 );
 		
 		this.updateVisibility({x:25,y:9})
 		
 		this.drawViewport();
 
-		//Block.defaultOpen = true;		
+		Block.defaultOpen = true;		
 
-		gCxt.lineWidth = 1;
+		gCxt.lineWidth = 3;
 		gCxt.strokeStyle = '#fff';
 		gCxt.beginPath();
 		var cc = this.chunkPixels;
@@ -367,6 +211,7 @@ function PitCraft() {
 	this.drawViewport = function() {
 		var mx = this.widthCells;
 		var my = this.heightCells;
+				
 		for(var x = 0; x < mx; x += 1) {
 			for(var y = 0; y < my; y += 1) {
 				this.drawBlock(x,y);
@@ -742,14 +587,38 @@ function PitCraft() {
 		}
 	}
 
-	this.insertBlock = function() {
-		if( ! this.hero.activeCell || ! this.hero.activeCell.reachable ) return;
+	this.makeTree = function(root,treeType) {
+		var blocks = Trees.getTreeBlocks(root,treeType);
+		for( var type in blocks ) {
+			for( var i in blocks[type] ) {
+				this.insertBlock(blocks[type][i], type, true);
+			}
+		}
+		
+	}
 
-		var ac = this.hero.activeCell;
+	this.testTrees = function() {
+		this.makeTree({x:28,y:11},'oak');
+		
+		//this.makeTree({x:29,y:11},'appleSmall');
+		this.makeTree({x:35,y:11},'bereza');
+		this.makeTree({x:19,y:11},'apple');
+	}
+
+	this.insertBlock = function(cell, type, ignoreLight) {
+		var ac;
+		if( typeof cell == 'undefined' ) {
+			if( ! this.hero.activeCell || ! this.hero.activeCell.reachable ) return;	
+			ac = this.hero.activeCell;
+		} else {
+			ac = cell;
+		}
+
 		var old = this.viewBlock(ac.x, ac.y);
 		if( old.type == 'air' || old.type == 'pit') {
 			
-			var block = new Block( this.blockInHand );
+			var block_type = type || this.blockInHand;
+			var block = new Block( block_type );
 			block.open = true;
 
 			if( block.brightness < old.brightness ) {
@@ -767,8 +636,8 @@ function PitCraft() {
 				this.addLightSource( block, ac.x, ac.y )
 			}
 
-
-			this.recalculateLight();
+			if( ! ignoreLight)
+				this.recalculateLight();
 		}
 
 	}
@@ -962,6 +831,12 @@ function PitCraft() {
 			}
 
 		}
+	}
+
+	this.addEnemies = function() {
+
+		this.enemies = new EnemiesCollection();
+		this.enemies.add( new Enemy('skeleton') );
 	}
 
 	this.updateVisibility = function(b, notGenerate ) {
@@ -1219,6 +1094,15 @@ function PitCraft() {
 		}
 
 		this.hero.moveRight();
+
+
+		b1 = this.hero.fitInCells[0];
+		b = this.viewBlock(b1.x,b1.y);
+		if( b.type == 'ladder') {
+			var dy = (this.hero.x -20)% 40;
+			this.hero.moveUp(dy);
+		}
+
 		return true;
 
 			
@@ -1665,7 +1549,7 @@ function PitCraft() {
 			this.hero.x -= this.chunkPixels * 2;
 			needRedraw = true;
 		} else if( this.hero.x < this.chunkPixels * 1.5 ) {
-			//LOad next left chunks
+			//Load next left chunks
 			this.view.x -= 2;
 			this.hero.x += this.chunkPixels * 2;
 			needRedraw = true;
@@ -1917,12 +1801,15 @@ function PitCraft() {
 			}
 		}
 
+		if( this.enemies.update() ) {
+			needRedraw = true;
+		}
+
 		return needRedraw;
 	}
 
 	this.draw = function() {
 		this.clearCanvas();
-				
 
 		if( this.needRedraw ) {
 			this.drawViewport();
@@ -1930,6 +1817,8 @@ function PitCraft() {
 		}
 
 		this.hero.draw();
+
+		this.enemies.draw();
 	}
 
 	
@@ -1956,6 +1845,6 @@ function PitCraft() {
 	}
 	
 }
-})()
+
 
 	

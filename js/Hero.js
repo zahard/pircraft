@@ -6,7 +6,6 @@ Hero = function(x,y,game) {
 
 	this.walkSpeed = 4;
 	this.runSpeed = 8;
-
 	this.framesFreq = 9;
 	this.currentFrame = 0;
 
@@ -188,8 +187,9 @@ Hero = function(x,y,game) {
 			this.look--;
 	}
 
-	this.moveUp = function() {
-		this.y -= 40;
+	this.moveUp = function(dy) {
+		dy = dy || 40;
+		this.y -= dy;
 		this.lastMoveV = 'up';
 	}
 

@@ -1,30 +1,30 @@
-
+/**
+ * Block of Lava
+ * Flowing and deadly substance
+ */
 BlockLava = function() {
 	this.sprite = {	x: 15, y: 15 };
 	this.hits = 1000;
 	this.lavaLevel = 0;
 	this.walkable = true;
 	this.isLava = true;
-
+	this.brightness = 6;
 	this.defaultBrightness = 6;
 }
-extend(BlockLava,Block);
+extend(BlockLava, Block);
 
-
+/**
+ * Block of flowing lava
+ */
 BlockLavaFlow = function() {
 	this.sprite = {	x: 15, y: 15 };
 	this.hits = 1000;
 	this.lavaLevel = 0;
 	this.walkable = true;
 	this.isLava = true;
-	this.pitSprite = {
-		x: 2,
-		y: 1
-	}
-	this.lavaSprite = {
-		x: 15,
-		y: 15
-	}
+	this.brightness = 6;
+	this.pitSprite = { x: 2, y: 1 };
+	this.lavaSprite = { x: 15, y: 15 };
 
 	this.flowSprite_1 = { x: 13, y: 10 }
 	this.flowSprite_2 = { x: 12, y: 10 }
@@ -32,7 +32,7 @@ BlockLavaFlow = function() {
 
 	this.defaultBrightness = 6;
 }
-extend(BlockLavaFlow,Block);
+extend(BlockLavaFlow, Block);
 
 
 BlockLavaFlow.prototype.draw = function(x,y) {
@@ -65,4 +65,3 @@ BlockLavaFlow.prototype.draw = function(x,y) {
 
 	map.restore();
 }
-
