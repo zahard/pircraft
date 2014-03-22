@@ -113,6 +113,8 @@ function PitCraft() {
 		this.addListeners();
 
 		this.drawLevel();
+
+		this.addEnemies();
 		
 		//Start game
 		this.animate();
@@ -123,7 +125,6 @@ function PitCraft() {
 		this.addLight();
 
 
-		this.addEnemies();
 /*
 		setTimeout(function(){
 			_this.testTrees();
@@ -834,9 +835,8 @@ function PitCraft() {
 	}
 
 	this.addEnemies = function() {
-
 		this.enemies = new EnemiesCollection();
-		this.enemies.add( new Enemy('skeleton') );
+		this.enemies.add( new Enemy(1200,480,this) );
 	}
 
 	this.updateVisibility = function(b, notGenerate ) {
@@ -1547,11 +1547,21 @@ function PitCraft() {
 			//Load next right chunks
 			this.view.x += 2;
 			this.hero.x -= this.chunkPixels * 2;
+
+			this.enemies.each(function(){
+				this.x -= _this.chunkPixels * 2;
+			});
+
 			needRedraw = true;
 		} else if( this.hero.x < this.chunkPixels * 1.5 ) {
 			//Load next left chunks
 			this.view.x -= 2;
 			this.hero.x += this.chunkPixels * 2;
+
+			this.enemies.each(function(){
+				this.x += _this.chunkPixels * 2;
+			});
+
 			needRedraw = true;
 		}
 
@@ -1559,11 +1569,21 @@ function PitCraft() {
 			//Load next bottom chunks
 			this.view.y += 1;
 			this.hero.y -= this.chunkPixels;
+
+			this.enemies.each(function(){
+				this.y -= _this.chunkPixels;
+			});
+
 			needRedraw = true;
 		} else if( this.hero.y < this.chunkPixels) {
 			//LOad next left chunks
 			this.view.y -= 1;
-			this.hero.y += this.chunkPixels ;
+			this.hero.y += this.chunkPixels;
+
+			this.enemies.each(function(){
+				this.y += _this.chunkPixels;
+			});
+
 			needRedraw = true;
 		}
 
@@ -1627,7 +1647,7 @@ function PitCraft() {
 						this.hero.runFrame = 1;
 					}
 				}
-				this.hero.currentFrame++;;
+				this.hero.currentFrame++;
 			
 			} else {
 				this.hero.runFrame = 0;
@@ -1818,7 +1838,7 @@ function PitCraft() {
 
 		this.hero.draw();
 
-		this.enemies.draw();
+		this.enemies.map('draw');
 	}
 
 	
