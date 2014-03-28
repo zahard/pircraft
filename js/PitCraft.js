@@ -25,71 +25,60 @@ window.addEventListener('load', function() {
 }, false);
 
 function PitCraft() {	
-	var _this = this,
-		canvas = $("canvas"),
-		mCanvas = $("mapCanvas"),
-		gCanvas = $("gridCanvas");
-	//	mpCanvas = $("miniMapCanvas");
+	var _this = this;
 
-	this.mainCanvas = $("canvas");
-	this.mapCanvas = $("mapCanvas");
-	this.gridCanvas = $("gridCanvas");
 
-	this.sprites = [];
+	/*************
+	* View port is 84 x 60 block ( maximum 7 x 5 chunks showed )
+	**************/
 
-	this.sprites['lamp'] = $('lamp');
-	this.sprites['tiles'] = $('tiles');
-
-	this.dayLight = 2; // up to 8
-	this.hero = new Hero(1040, 480, this);
-
-	//View port is 84 x 60 block ( maximum 7 x 5 chunks showed )
-		
+	//Chunks offset from world begginning
 	this.view = {x:0,y:0};
 
-	this.widthChunks = 7;
-	this.heightChunks = 5;
+	//Loaded chunks at time 7x5 => 35 ones
+	this.widthChunks = 7; // 7 chunks in horizontal
+	this.heightChunks = 5;// and 5 chunk in vertical 
 
+	//Chunk contains 144 blocks 12x12
 	this.chunkSize = 12;
+
+	//Cellsize ( block width ) is 40 pixels
 	this.cellSize = 40;
 
+	//Chunk width in pixels
 	this.chunkPixels = this.chunkSize * this.cellSize; //480
-
-	this.maxLight = 12;
+	
 
 	//Viewport width
 	this.width  = this.widthChunks  * this.chunkPixels;
 	this.height = this.heightChunks * this.chunkPixels;
 
+	//Available blocks(cells) in viewport
 	this.widthCells  = this.widthChunks  * this.chunkSize;
 	this.heightCells = this.heightChunks * this.chunkSize;
 
-	canvas.width  = this.width;
-	canvas.height = this.height;
-	cxt = canvas.getContext("2d");
+	this.mainCanvas = $("canvas");
+	this.mapCanvas = $("mapCanvas");
+	this.gridCanvas = $("gridCanvas");
 
-	mCanvas.width  = this.width;
-	mCanvas.height = this.height;
-	map = mCanvas.getContext("2d");
-
-	gCanvas.width  = this.width;
-	gCanvas.height = this.height;
-	gCxt = gCanvas.getContext("2d");
-/*
-	mpCanvas.width  = 144;
-	mpCanvas.height = 60;
-	miniMap = mpCanvas.getContext("2d");
-*/
+	cxt = new Layer(this.mainCanvas, this.width, this.height);
+	map = new Layer(this.mapCanvas, this.width, this.height);
+	gCxt = new Layer(this.gridCanvas, this.width, this.height);
 
 	//Holder for mouse events
 	this.mouse = { x: 0, y: 0, clicked: false };
 
 
+	this.sprites = [];
+	this.sprites['lamp'] = $('lamp');
+	this.sprites['tiles'] = $('tiles');
+
+	this.dayLight = 2; // up to 8
+	this.maxLight = 12;
 	this.prevDayLight = 7 // up to 0.8
-	
+		
 	this.keyPressed = false; // keyUp
 	this.keyPushed = false;  // keyDown
-
 
 	this.movePressed = 0;
 
@@ -98,17 +87,20 @@ function PitCraft() {
 	this.lastFallFrame = 0;
 	this.fallTimeout = 25;
 	
-
 	this.isFalling = false;
 	
-
 	this.lights = [];
+
+	this.world = {};
 
 	Block.game = this;
 
 	this.MapGenerator = new generator(this);
 
-	this.init = function() {	
+	this.init = function() {
+
+		this.hero = new Hero(1040, 480, this);
+
 		//Listen for mouse events
 		this.addListeners();
 
@@ -116,67 +108,25 @@ function PitCraft() {
 
 		this.addEnemies();
 		
-		//Start game
-		this.animate();
+		//animate was here
 		
-
 		this.updateViewport();
 
 		this.addLight();
 
+		this.animate();
 
-/*
-		setTimeout(function(){
-			_this.testTrees();
-		},500);*/
-
-		/*
-		setInterval(function() {
-			if( _this.dayLight > _this.prevDayLight ) {
-				if( _this.dayLight < 0.8 ) {
-					_this.setDayLight( _this.dayLight + 0.1 );
-				} else {
-					_this.setDayLight( _this.dayLight - 0.1 );
-				}
-			} else {
-				if( _this.dayLight > 0.1 ) {
-					_this.setDayLight( _this.dayLight - 0.1 );
-				} else {
-					_this.setDayLight( _this.dayLight + 0.1 );
-				}
-			}
-
-		},5000);*/
 	}
 
-	this.generated = 0;
-	
+	this.totalChunksGenerated = 0;
 	this.generateChunk = function(cx,cy) {
-		this.generated++;
+		this.totalChunksGenerated++;
 		return this.MapGenerator.createChunk(cx,cy);
 	}
-		
-		
-
-	this.saveWorld = function() {
-		var map = JSON.stringify(this.world)		
-		$('textarea_save').style.display = 'block';
-		$('textarea_save').value = map;
-		function Zahard(){
-
-		}
-		var z = new Zahard();
-		z.map = map;
-		window.z = z;
-	}
-
 
 
 	this.drawLevel = function() {
 
-		this.world = {};
-		
-		
 		for( var cx = 0; cx < this.widthChunks; cx++ ) {
 			this.world[cx] = {};
 			for( var cy = 0; cy < this.heightChunks; cy++ ) {
@@ -836,7 +786,7 @@ function PitCraft() {
 
 	this.addEnemies = function() {
 		this.enemies = new EnemiesCollection();
-		this.enemies.add( new Enemy(1200,480,this) );
+		//this.enemies.add( new Enemy(1200,480,this) );
 	}
 
 	this.updateVisibility = function(b, notGenerate ) {
@@ -1456,16 +1406,14 @@ function PitCraft() {
 			_this.animate();
 		} else {
 			_this.isPaused = true;
-			cxt.save();
-			cxt.globalAlpha = 0.7;
-			cxt.fillStyle = '#333';
-			cxt.fillRect(0,0,this.width,this.height);
-			cxt.globalAlpha = 1;
-			cxt.fillStyle = '#fff'
-			cxt.font = '40px Impact';
-			var text = 'P A U S E D'
-			cxt.fillText(text, this.width/2 - cxt.measureText(text).width/2, this.height/2 + 20);
-			cxt.restore();
+			
+			cxt
+			.save()
+			.setProperties({ globalAlpha: 0.7, fillStyle: '#333'})
+			.fillRect(0,0,this.width,this.height)
+			.setProperties({ globalAlpha: 1, fillStyle: '#fff',font: '40px Impact'})
+			.fillText('P A U S E D', this.width/2 - cxt.measureText(text).width/2, this.height/2 + 20)
+			.restore();
 		}
 	}
 
@@ -1838,7 +1786,7 @@ function PitCraft() {
 
 		this.hero.draw();
 
-		this.enemies.map('draw');
+		//this.enemies.map('draw');
 	}
 
 	
@@ -1853,6 +1801,7 @@ function PitCraft() {
 	this.on = function(event, handler) {
 		if( typeof this.subscribers == 'undefined' )
 			this.subscribers = {};
+
 
 		if( typeof this.subscribers[event] == 'undefined' )
 			this.subscribers[event] = [];
