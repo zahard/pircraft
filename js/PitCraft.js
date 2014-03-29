@@ -88,12 +88,15 @@ function PitCraft() {
 	this.fallTimeout = 25;
 	
 	this.isFalling = false;
-	
+
 	this.lights = [];
 
 	this.world = {};
 
 	Block.game = this;
+
+
+	this.keyboard = new KeyboardManager(this);
 
 	this.MapGenerator = new generator(this);
 
@@ -124,7 +127,6 @@ function PitCraft() {
 		return this.MapGenerator.createChunk(cx,cy);
 	}
 
-
 	this.drawLevel = function() {
 
 		for( var cx = 0; cx < this.widthChunks; cx++ ) {
@@ -141,22 +143,26 @@ function PitCraft() {
 		
 		this.drawViewport();
 
-		Block.defaultOpen = true;		
+		Block.defaultOpen = true;
 
-		gCxt.lineWidth = 3;
-		gCxt.strokeStyle = '#fff';
-		gCxt.beginPath();
+		this.drawGrid();
+	}
+
+	this.drawGrid = function() {
+		gCxt.setProperties({
+			lineWidth: 3,
+			strokeStyle: '#fff'
+		})
+		.beginPath();
+
 		var cc = this.chunkPixels;
-		for( var x = cc; x < this.width; x += cc) {
-			gCxt.moveTo(x,0);
-			gCxt.lineTo(x,this.height);
-		}
-		for( var y = cc; y < this.height; y += cc) {
-			gCxt.moveTo(0,y);
-			gCxt.lineTo(this.width,y);
-		}
-		gCxt.closePath();
-		gCxt.stroke();
+		for( var x = cc; x < this.width; x += cc )
+			gCxt.moveTo(x,0).lineTo(x,this.height);
+
+		for( var y = cc; y < this.height; y += cc )
+			gCxt.moveTo(0,y).lineTo(this.width,y);
+
+		gCxt.closePath().stroke();
 	}
 
 	this.drawViewport = function() {
@@ -259,50 +265,61 @@ function PitCraft() {
 		}
 	}
 
+	/**
+	* Redraw each air block in viewport
+	*/
 	this.redrawAir = function() {
-		for(var x = 0; x < 24; x += 1) {
-			for(var y = 0; y < 12; y += 1) {
+		for(var x = 0; x < this.widthCells; x += 1) {
+			for(var y = 0; y < this.heightCells; y += 1) {
 				var block = this.viewBlock(x,y);
 				if( block.type == 'air' ) {
-					map.fillStyle = this.getBlockColor(block.type,y);
-					map.fillRect(this.cellSize*x,this.cellSize*y,this.cellSize,this.cellSize);
+					var br = block.brightness;
+					if( br < this.dayLight ) {
+						br = this.dayLight;
+					}
+					map.fillStyle = HSVtoRGB( 0.5, 0.5, br / 10 );
+					map.fillRect(
+						this.cellSize*x,this.cellSize*y,
+						this.cellSize,this.cellSize
+					);
 				}
-			}			
+			}	
 		}
 	}
 
+	/**
+	* Draw block on given vewport position
+	*/
 	this.drawBlock = function(x,y) {
 		var block = this.viewBlock(x,y);
-		
+		// Is block is not opened yet we draw darkness
 		if( ! block.open ) {
 			map.fillStyle = '#000';
-			map.fillRect(this.cellSize*x,this.cellSize*y,this.cellSize,this.cellSize);
+			map.fillRect(
+				this.cellSize*x, this.cellSize*y,
+				this.cellSize, this.cellSize
+			);
 		} else {
 			block.draw(x,y);
 		}
 	}
 
-	var c = {};
-	c['air']   = HSVtoRGB( 0.5, 0.5, this.dayLight);
-	c['pit']   = HSVtoRGB( 0.5, 0.1, this.dayLight);
-	c['grass'] = '#22B31B';
-	c['dirt']  = '#BA9F6E';
-	c['stone'] = '#918D81';
-	c['wood']  = '#703E06';
-	c['leaf']  = '#3FDB37';		
-	c['torch']  = 'orange';		
-	
-	this.colors = c;
 
+	/**
+	* Set default ait brightness
+	*/
 	this.setDayLight = function(brightness){
 		this.prevDayLight = this.dayLight;
-		this.dayLight = brightness;
-		this.colors['air'] = HSVtoRGB( 0.5, 0.5, this.dayLight);
-
+		this.dayLight = brightness;	
 		this.redrawAir();
 		this.addLight();
 	}
 
+
+	/**
+	* First we apply default brithness to all block
+	* and then calculate lights
+	*/
 	this.recalculateLight = function(){
 		for(var x = 0; x < this.widthCells; x += 1) {
 			for(var y = 0; y < this.heightCells; y += 1) {
@@ -316,12 +333,18 @@ function PitCraft() {
 		this.addLight();
 	}
 
+	/**
+	* Add light to scene. 
+	* 
+	* Iterating trough all light sources and 
+	* calculate light directions and reflections
+	*/
 	this.addLight = function() {
 			
 		var l, c,x, min_y, y, d,  sx,sy,cells = [];
 		var iteration;
 
-		//LIght direction  - bottom,top,left,right
+		//Light direction  - bottom,top,left,right
 		var directions = [
 			{x: 0,y:-1},
 			{x: 0,y: 1},
@@ -396,7 +419,6 @@ function PitCraft() {
 							sy = l.y + d.y * level + orto_y * orto; 
 
 							var subBeamCell = this.viewBlock(sx, sy);
-							
 							if( ! subBeamCell.walkable ) {
 								cells.push({
 									x: sx, 
@@ -405,7 +427,6 @@ function PitCraft() {
 								});
 								break;
 							}
-
 
 							if( subBeamCell.type && subBeamCell.setBrightness( sub_brightness ) ) {
 								cells.push({ 
@@ -479,65 +500,22 @@ function PitCraft() {
 				}
 			}
 
-
-			
 			var cl;
 			var brightness;
 			for( var i in cells ) {
 				c = cells[i];
-				
 				brightness = c.brightness;
-
-				/*
-				if( c.type == 'air' ) {
-					if( brightness < this.dayLight) {
-						brightness = this.dayLight;
-					}
-				}*/
-
 				var bl = this.viewBlock(c.x,c.y);
-
 				bl.setBrightness(brightness)
 				bl.draw(c.x,c.y);
-				
-
-				
-				//this.drawBlock( this.viewBlock(c.x,c.y), c.x, c.y);
-				//this.viewBlock(c.x,c.y).draw();
-
-				//map.fillStyle = color;
-				//map.fillRect( this.cellSize * c.x, this.cellSize * c.y, this.cellSize, this.cellSize );
-
-				
 			}
 		}
-
 	}
 
 
-
-	this.getBlockColor = function(cell,x,y) {
-		if( cell == 'air') {
-
-			var br = this.viewBlock(x,y).brightness;
-			if( br < this.dayLight ) {
-				br = this.dayLight;
-			}
-
-			return HSVtoRGB( 0.5, 0.5, br/10);
-
-
-		} else if( cell == 'pit') {
-			var br = this.viewBlock(x,y).brightness;
-			return HSVtoRGB( 0.05, 0.5, br/10);
-			//return HSVtoRGB( 0.05, 0.5, 0.6);
-			
-		}
-		 else {
-			return this.colors[cell];
-		}
-	}
-
+	/**
+	* Create a tree
+	*/
 	this.makeTree = function(root,treeType) {
 		var blocks = Trees.getTreeBlocks(root,treeType);
 		for( var type in blocks ) {
@@ -548,14 +526,21 @@ function PitCraft() {
 		
 	}
 
+	//Testing trees
 	this.testTrees = function() {
 		this.makeTree({x:28,y:11},'oak');
-		
-		//this.makeTree({x:29,y:11},'appleSmall');
+		this.makeTree({x:29,y:11},'appleSmall');
 		this.makeTree({x:35,y:11},'bereza');
 		this.makeTree({x:19,y:11},'apple');
 	}
 
+	/**
+	* Insert block in given cell
+	*
+	* @param ignoreLight - if we know that this block is walkable 
+	*  and it appearing not changing anything in light speading,
+	*  we not recalculate light
+	*/
 	this.insertBlock = function(cell, type, ignoreLight) {
 		var ac;
 		if( typeof cell == 'undefined' ) {
@@ -590,9 +575,11 @@ function PitCraft() {
 			if( ! ignoreLight)
 				this.recalculateLight();
 		}
-
 	}
 
+	/**
+	* Bring damage to block
+	*/
 	this.hitBlock = function() {
 		if( ! this.hero.activeCell || ! this.hero.activeCell.reachable ) return;
 		
@@ -640,14 +627,12 @@ function PitCraft() {
 
 
 	this.checkLavaFlow = function(main,x,y,i) {
-		
 		this.checkLavaFall( main, x, y);
 		this.checkLavaRightFlow( main,x,y);
 		this.checkLavaLeftFlow( main,x,y);
-	
 		return;
-
 	}
+
 
 	this.checkLavaFall = function(main, x, y) {
 		//If lava is falling down
@@ -719,14 +704,11 @@ function PitCraft() {
 						this.checkLavaFall( left_block,  x - l, y );
 					}
 
-
 				} else {
 					break;
 				}
 			}
-
 		}
-
 	}
 
 	this.checkLavaRightFlow = function(main,x,y) {
@@ -783,6 +765,7 @@ function PitCraft() {
 
 		}
 	}
+
 
 	this.addEnemies = function() {
 		this.enemies = new EnemiesCollection();
@@ -843,182 +826,78 @@ function PitCraft() {
 	}
 
 	this.addListeners = function() {
-		/*
-		window.addEventListener('mousemove',function(e) {
-			_this.mouse.x = e.clientX;
-			_this.mouse.y = e.clientY;
+		
+		this.keyboard.up('escape', function(e) { 
+			_this.pauseGame(e); 
 		});
 
-		window.addEventListener('click',function(e) {
-			_this.mouse.x = e.clientX;
-			_this.mouse.y = e.clientY;
-			_this.mouse.clicked = true;
+		//Change block in hand
+		this.keyboard.up('1', function() { _this.blockInHand = 'dirt'; });
+		this.keyboard.up('2', function() { _this.blockInHand = 'stone'; });
+		this.keyboard.up('3', function() { _this.blockInHand = 'stairs'; });
+		this.keyboard.up('4', function() { _this.blockInHand = 'torch'; });
+		this.keyboard.up('5', function() { _this.blockInHand = 'lava'; });
+
+		//REmove block
+		this.keyboard.up('e', function() {
+			_this.hitBlock();
 		});
 
-		window.addEventListener('mousedown',function(e) {
-			_this.mouse.x = e.clientX;
-			_this.mouse.y = e.clientY;
-			_this.mouse.down = true;
-		});	
+		//Place new block
+		this.keyboard.up('f', function() {
+			_this.insertBlock();
+		});
 
-		window.addEventListener('mouseup',function(e) {
-			_this.mouse.up = true;
-		});*/
-
-		window.addEventListener('keyup',function(e) {	
-			var ESC = 27;
-
-			switch( e.keyCode ) {
-				case ESC:
-					_this.pauseGame(e);
-					break;
-
-				case 49: // 1
-					_this.blockInHand = 'dirt';
-					break;
-				case 50: // 2
-					_this.blockInHand = 'stone';
-					break;
-				case 51: // 3
-					_this.blockInHand = 'stairs';
-					break;
-				case 52: // 4
-					_this.blockInHand = 'torch';
-					break;
-				case 53: // 5
-					_this.blockInHand = 'lava';
-					break;
+		// Jump
+		this.keyboard.down('space', function() {
+			_this.jump();
+		});
 
 
-				case 69: // E
-					this.E_PRESSED = false;
-					_this.hitBlock();
-					break;	
-
-				case 70: // F
-					_this.insertBlock();
-					break;
-
-				case 87: // W
-					//_this.moveUp();
-					break;
-
-				case 83: // S
-					//_this.moveDown();
-					break;
-
-				case 16: //SHIFT
-					SHIFT_PRESSED = false;
-					_this.hero.speed = _this.hero.walkSpeed;
-					break;
-
-				case 68: // D
-					//RIGHT_PRESSED = false;
-					//_this.moveRight();
-					break;
-				case 65: // A
-					//LEFT_PRESSED = false;
-					//_this.moveLeft();
-					break;
-
-				case 39: // Look RIGHT
-					RIGHT_PRESSED = false;
-					/*
-					if( _this.hero.direction == 'right' || SHIFT_PRESSED ) {
-						_this.moveRight();
-					} else {
-						_this.hero.direction  = 'right';
-					} */
-
-					break;
-
-				case 37: // Look LEFT
-					LEFT_PRESSED = false;
-					/*
-					if( _this.hero.direction == 'left' || SHIFT_PRESSED ) {
-						_this.moveLeft();
-					} else {
-						_this.hero.direction  = 'left';
-					}
-					*/
-					break;
-
-				case 38: //UP
-					if( SHIFT_PRESSED ) {
-						_this.moveUp();	
-					} else {
-						_this.hero.lookUp();
-					}
-					UP_PRESSED = false;
-					break;
-				case 40: //DOWN
-					if( SHIFT_PRESSED ) {
-						_this.moveDown();	
-					} else {
-						_this.hero.lookDown();
-					}
-					DOWN_PRESSED = false;
-					break;
+		//IF first pressed just change look direction
+		this.keyboard.down('right',function() {
+			if( _this.hero.direction == 'left' ) {
+				_this.hero.direction = 'right';
+				key.isPressed = false;
 			}
+		});
 
+		//If first pressed just change look direction
+		this.keyboard.down('left',function() {
+			if( _this.hero.direction == 'right' ) {
+				_this.hero.direction = 'left';
+				key.isPressed = false;
+			}
+		});
+
+		this.keyboard.up('up', function() {
+			//If shift pressed move hero
+			if( this.keyboard.isPressed('shift') ) {
+				_this.moveUp();	
+			//if no - change look
+			} else {
+				_this.hero.lookUp();
+			}
+		});
+
+		this.keyboard.up('down', function() {
+			//If shift pressed move hero
+			if( this.keyboard.isPressed('shift') ) {
+				_this.moveDown();
+			//if no - change look
+			} else {
+				_this.hero.lookDown();
+			}
+		});
+
+		window.addEventListener('keyup',function(e) {
 			_this.keyPressed = true;
-
 		});	
 
 		window.addEventListener('keydown',function(e) {
-			
-			switch( e.keyCode ) {
-				case 16: //SHIFT
-					SHIFT_PRESSED = true;
-					_this.hero.speed = _this.hero.runSpeed;
-					break;
-
-				case 32: //SPACE
-					//Jump or Climb
-					_this.jump();
-					break;
-
-				case 69:
-					this.E_PRESSED = true;
-					break;
-
-				case 76://L
-					//_this.hero.y -= 80;
-					break;
-
-				case 68: // D 
-					//RIGHT_PRESSED = true;
-					break;
-				case 65: // A
-					//LEFT_PRESSED = true;
-					break;
-
-				case 39: // Look RIGHT
-					if( _this.hero.direction == 'left' ) {
-						_this.hero.direction = 'right';
-					} else {
-						RIGHT_PRESSED = true;
-					}
-
-					break;
-				case 37: // Look LEFT
-					if( _this.hero.direction == 'right' ) {
-						_this.hero.direction = 'left';
-					} else {
-						LEFT_PRESSED = true;
-					}
-					
-					break;
-
-				case 38: //Look UP
-					UP_PRESSED = true;
-					break;
-				case 40: //Look DOWN
-					DOWN_PRESSED = true;
-					break;
-			}
 			_this.keyPushed = true;
-		});	
+		});
+
 	}
 
 	this.moveRight = function() {
@@ -1406,13 +1285,13 @@ function PitCraft() {
 			_this.animate();
 		} else {
 			_this.isPaused = true;
-			
+			var text = 'P A U S E D';
 			cxt
 			.save()
 			.setProperties({ globalAlpha: 0.7, fillStyle: '#333'})
 			.fillRect(0,0,this.width,this.height)
 			.setProperties({ globalAlpha: 1, fillStyle: '#fff',font: '40px Impact'})
-			.fillText('P A U S E D', this.width/2 - cxt.measureText(text).width/2, this.height/2 + 20)
+			.fillText(text, this.width/2 - cxt.measureText(text).width/2, this.height/2 + 20)
 			.restore();
 		}
 	}
@@ -1549,7 +1428,7 @@ function PitCraft() {
 	this.update = function() {
 		
 		var needRedraw = false;
-		
+		var keys = this.keyboard;
 
 		if( this.keyPressed ) {
 			this.keyPressed = false;
@@ -1573,18 +1452,18 @@ function PitCraft() {
 		var t = new Date().getTime();
 		
 		
-		if( NEED_UPDATE || LEFT_PRESSED || RIGHT_PRESSED ) {
+		if( NEED_UPDATE || keys.isPressed('left') || keys.isPressed('right') ) {
 			NEED_UPDATE = false;
 
 
 
 			//Move our hero
-			if( ( LEFT_PRESSED || RIGHT_PRESSED )  && ( ! this.isFalling || this.falled ) ) {
+			if( ( keys.isPressed('left') || keys.isPressed('right') )  && ( ! this.isFalling || this.falled ) ) {
 				
 
-				if( LEFT_PRESSED ) {
+				if( keys.isPressed('left') ) {
 					this.moveLeft();
-				} else if( RIGHT_PRESSED ) {
+				} else if( keys.isPressed('right') ) {
 					this.moveRight();
 				}
 
