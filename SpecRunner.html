@@ -1,0 +1,73 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>Jasmine Spec Runner v2.0.0</title>
+
+  <link rel="shortcut icon" type="image/png" href="lib/jasmine-2.0.0/jasmine_favicon.png">
+  <link rel="stylesheet" type="text/css" href="lib/jasmine-2.0.0/jasmine.css">
+
+  <script type="text/javascript" src="lib/jasmine-2.0.0/jasmine.js"></script>
+  <script type="text/javascript" src="lib/jasmine-2.0.0/jasmine-html.js"></script>
+  <script type="text/javascript" src="lib/jasmine-2.0.0/boot.js"></script>
+
+  <!-- include source files here... -->
+  <script type="text/javascript" src="js/helpers.js"></script>
+  <script type="text/javascript" src="js/Trees.js"></script>
+  
+  <script type="text/javascript" src="js/Block.js"></script>
+  <script type="text/javascript" src="js/Blocks/BlockAir.js"></script>
+  <script type="text/javascript" src="js/Blocks/BlockBereza.js"></script>
+  <script type="text/javascript" src="js/Blocks/BlockDirt.js"></script>
+  <script type="text/javascript" src="js/Blocks/BlockGrass.js"></script>
+  <script type="text/javascript" src="js/Blocks/BlockLadder.js"></script>
+  <script type="text/javascript" src="js/Blocks/BlockLava.js"></script>
+  <script type="text/javascript" src="js/Blocks/BlockLeaf.js"></script>
+  <script type="text/javascript" src="js/Blocks/BlockOakwood.js"></script>
+  <script type="text/javascript" src="js/Blocks/BlockObsidian.js"></script>
+  <script type="text/javascript" src="js/Blocks/BlockPit.js"></script>
+  <script type="text/javascript" src="js/Blocks/BlockStairs.js"></script>
+  <script type="text/javascript" src="js/Blocks/BlockStone.js"></script>
+  <script type="text/javascript" src="js/Blocks/BlockTorch.js"></script>
+  <script type="text/javascript" src="js/Blocks/BlockWood.js"></script>
+
+ 
+  <script type="text/javascript" src="js/KeyboardManager.js"></script>
+
+  <script type="text/javascript" src="js/Enemy.js"></script>
+  <script type="text/javascript" src="js/Enemy.js"></script>
+
+  <script type="text/javascript" src="js/Layer.js"></script>
+  <script type="text/javascript" src="js/LayersManager.js"></script>
+
+  <script type="text/javascript" src="js/Hero.js"></script>
+  <script type="text/javascript" src="js/generator.js"></script>
+  <script type="text/javascript" src="js/PitCraft.js"></script>
+  
+</head>
+
+<body>
+
+  <div style="display:none">
+  <div id="viewport">
+      <canvas id="canvas" crossOrigin="anonymous" ></canvas>
+      <canvas id="mapCanvas" crossOrigin="anonymous"></canvas>
+      <canvas id="gridCanvas" crossOrigin="anonymous"></canvas>
+      <div id="border"></div>
+      
+      <!--<canvas id="miniMapCanvas" crossOrigin="anonymous"></canvas>-->
+    </div>
+    <textarea id="textarea_save"></textarea>>
+    <img id="lamp" src="lamp.png">
+    <img id="tiles" src="tiles.png">
+    <img id="miner_head" src="miner_head.png">
+    <img id="miner_legs" src="miner_legs.png">
+    <img id="miner_hand" src="miner_hand.png">
+    <h1 id="fps" style="position: absolute;right: 30px;top: 0;color: #FFF;"></h1>
+</div>
+
+  <!-- include spec files here... -->
+  <script type="text/javascript" src="spec/BlockSpec.js"></script>
+
+</body>
+</html>
