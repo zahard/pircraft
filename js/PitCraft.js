@@ -872,7 +872,7 @@ function PitCraft() {
 
 		this.keyboard.up('up', function() {
 			//If shift pressed move hero
-			if( this.keyboard.isPressed('shift') ) {
+			if( _this.keyboard.isPressed('shift') ) {
 				_this.moveUp();	
 			//if no - change look
 			} else {
@@ -882,7 +882,7 @@ function PitCraft() {
 
 		this.keyboard.up('down', function() {
 			//If shift pressed move hero
-			if( this.keyboard.isPressed('shift') ) {
+			if( _this.keyboard.isPressed('shift') ) {
 				_this.moveDown();
 			//if no - change look
 			} else {
